@@ -21,17 +21,36 @@ jobs:
           java-version: "17"
 
       - name: Install Android SDK 36
+        shell: bash
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-      - name: Setup Gradle
+          echo "Android SDK: $ANDROID_HOME"
+          echo "sdkmanager: $SDKMANAGER"
+
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager no encontrado"
+            find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f || true
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0"
+
+      - name: Setup Gradle 8.13
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
 
       - name: Create LIFEAPP Android project
+        shell: bash
         run: |
+          set -e
+
           mkdir -p app/src/main/java/app/lifeapp/mobile
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/drawable
@@ -88,9 +107,23 @@ jobs:
                   versionName '3.0.0'
               }
 
+              buildTypes {
+                  debug {
+                      minifyEnabled false
+                  }
+
+                  release {
+                      minifyEnabled false
+                  }
+              }
+
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
+              }
+
+              lint {
+                  abortOnError false
               }
           }
           EOF
@@ -130,7 +163,9 @@ jobs:
               <color name="life_blue">#3183FF</color>
               <color name="life_purple">#7556F4</color>
               <color name="life_pink">#EE50B8</color>
-              <color name="life_icon_background">#6758F2</color>
+              <color name="text_primary">#1D2336</color>
+              <color name="text_secondary">#697080</color>
+              <color name="surface">#F8F9FD</color>
           </resources>
           EOF
 
@@ -175,30 +210,24 @@ jobs:
               android:viewportWidth="108"
               android:viewportHeight="108">
 
-              <!-- Sol -->
               <path
                   android:fillColor="#FFD95B"
-                  android:pathData="M54,21
-                                    m-11,0
-                                    a11,11 0,1 0,22 0
-                                    a11,11 0,1 0,-22 0" />
+                  android:pathData="M43,22
+                                    A11,11 0,1 0,65,22
+                                    A11,11 0,1 0,43,22" />
 
-              <!-- Montaña izquierda -->
               <path
                   android:fillColor="#FFFFFF"
-                  android:pathData="M14,76 L39,45 L58,76 Z" />
+                  android:pathData="M14,77 L39,45 L58,77 Z" />
 
-              <!-- Montaña derecha -->
               <path
-                  android:fillColor="#DCEBFF"
-                  android:pathData="M43,76 L68,48 L94,76 Z" />
+                  android:fillColor="#DBEBFF"
+                  android:pathData="M43,77 L68,48 L94,77 Z" />
 
-              <!-- Nieve -->
               <path
                   android:fillColor="#FFFFFF"
                   android:pathData="M32,54 L39,45 L46,56 L42,54 L39,58 L36,54 Z" />
 
-              <!-- Hoja izquierda -->
               <path
                   android:fillColor="#FFFFFF"
                   android:pathData="M52,84
@@ -206,13 +235,23 @@ jobs:
                                     C40,97 49,94 54,87
                                     C52,87 51,86 52,84 Z" />
 
-              <!-- Hoja derecha -->
               <path
                   android:fillColor="#FFFFFF"
                   android:pathData="M56,84
                                     C64,73 74,76 71,86
                                     C68,97 59,94 54,87
                                     C56,87 57,86 56,84 Z" />
+
+              <path
+                  android:strokeColor="#FFFFFF"
+                  android:strokeWidth="2.5"
+                  android:strokeLineCap="round"
+                  android:fillColor="@android:color/transparent"
+                  android:pathData="M54,7 L54,13
+                                    M31,14 L35,19
+                                    M77,14 L73,19
+                                    M22,34 L29,34
+                                    M79,34 L86,34" />
 
           </vector>
           EOF
@@ -224,10 +263,10 @@ jobs:
               <item android:drawable="@drawable/ic_launcher_background" />
 
               <item
-                  android:left="18dp"
-                  android:top="18dp"
-                  android:right="18dp"
-                  android:bottom="18dp"
+                  android:left="14dp"
+                  android:top="14dp"
+                  android:right="14dp"
+                  android:bottom="14dp"
                   android:drawable="@drawable/ic_launcher_foreground" />
 
           </layer-list>
@@ -240,10 +279,10 @@ jobs:
               <item android:drawable="@drawable/ic_launcher_background" />
 
               <item
-                  android:left="18dp"
-                  android:top="18dp"
-                  android:right="18dp"
-                  android:bottom="18dp"
+                  android:left="14dp"
+                  android:top="14dp"
+                  android:right="14dp"
+                  android:bottom="14dp"
                   android:drawable="@drawable/ic_launcher_foreground" />
 
           </layer-list>
@@ -285,6 +324,8 @@ jobs:
           import android.os.Bundle;
           import android.view.Gravity;
           import android.view.ViewGroup;
+          import android.view.WindowInsets;
+          import android.widget.Button;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
@@ -302,16 +343,30 @@ jobs:
                   root.setOrientation(LinearLayout.VERTICAL);
                   root.setBackgroundColor(Color.rgb(248, 249, 253));
 
+                  root.setOnApplyWindowInsetsListener((view, insets) -> {
+                      android.graphics.Insets bars =
+                              insets.getInsets(WindowInsets.Type.systemBars());
+
+                      view.setPadding(
+                              bars.left,
+                              bars.top,
+                              bars.right,
+                              bars.bottom
+                      );
+
+                      return insets;
+                  });
+
                   LinearLayout header = new LinearLayout(this);
                   header.setOrientation(LinearLayout.VERTICAL);
-                  header.setPadding(dp(22), dp(20), dp(22), dp(14));
+                  header.setPadding(dp(22), dp(18), dp(22), dp(14));
                   header.setBackgroundColor(Color.WHITE);
 
                   headerTitle = text(
                           "LIFEAPP",
                           28,
                           true,
-                          Color.rgb(74, 77, 180)
+                          Color.rgb(77, 76, 181)
                   );
 
                   header.addView(headerTitle);
@@ -320,17 +375,26 @@ jobs:
                           "Tu vida, organizada en un solo lugar",
                           14,
                           false,
-                          Color.rgb(105, 111, 128)
+                          Color.rgb(105, 112, 128)
                   );
 
-                  header.addView(subtitle);
+                  LinearLayout.LayoutParams subtitleParams =
+                          new LinearLayout.LayoutParams(
+                                  ViewGroup.LayoutParams.MATCH_PARENT,
+                                  ViewGroup.LayoutParams.WRAP_CONTENT
+                          );
+
+                  subtitleParams.topMargin = dp(3);
+
+                  header.addView(subtitle, subtitleParams);
+
                   root.addView(header);
 
                   ScrollView scroll = new ScrollView(this);
 
                   content = new LinearLayout(this);
                   content.setOrientation(LinearLayout.VERTICAL);
-                  content.setPadding(dp(18), dp(18), dp(18), dp(18));
+                  content.setPadding(dp(18), dp(18), dp(18), dp(20));
 
                   scroll.addView(content);
 
@@ -375,7 +439,7 @@ jobs:
                   hero.setGravity(Gravity.CENTER_VERTICAL);
                   hero.setPadding(dp(22), dp(20), dp(22), dp(20));
 
-                  GradientDrawable gradient = new GradientDrawable(
+                  GradientDrawable heroGradient = new GradientDrawable(
                           GradientDrawable.Orientation.TL_BR,
                           new int[]{
                                   Color.rgb(49, 131, 255),
@@ -384,8 +448,8 @@ jobs:
                           }
                   );
 
-                  gradient.setCornerRadius(dp(24));
-                  hero.setBackground(gradient);
+                  heroGradient.setCornerRadius(dp(24));
+                  hero.setBackground(heroGradient);
 
                   LinearLayout.LayoutParams heroParams =
                           new LinearLayout.LayoutParams(
@@ -397,9 +461,22 @@ jobs:
 
                   content.addView(hero, heroParams);
 
-                  addCard("Actividad", "Buen ritmo · 7.842 pasos");
-                  addCard("Agenda", "3 eventos para hoy");
-                  addCard("Objetivos", "72% completado esta semana");
+                  addTitle("Tu día");
+
+                  addCard(
+                          "Actividad",
+                          "Buen ritmo · 7.842 pasos"
+                  );
+
+                  addCard(
+                          "Agenda",
+                          "3 eventos para hoy"
+                  );
+
+                  addCard(
+                          "Objetivos",
+                          "72% completado esta semana"
+                  );
 
                   TextView askLife = text(
                           "✦  ASK LIFE",
@@ -429,7 +506,7 @@ jobs:
                                   ViewGroup.LayoutParams.WRAP_CONTENT
                           );
 
-                  askParams.topMargin = dp(12);
+                  askParams.topMargin = dp(10);
 
                   content.addView(askLife, askParams);
               }
@@ -437,6 +514,8 @@ jobs:
               private void showExplore() {
                   headerTitle.setText("Explorar");
                   content.removeAllViews();
+
+                  addTitle("Todo LIFEAPP");
 
                   String[] modules = {
                           "❤️  Salud",
@@ -450,7 +529,10 @@ jobs:
                   };
 
                   for (String module : modules) {
-                      addCard(module, "Abrir módulo LIFEAPP");
+                      addCard(
+                              module,
+                              "Abrir módulo LIFEAPP"
+                      );
                   }
               }
 
@@ -458,40 +540,85 @@ jobs:
                   headerTitle.setText("ASK LIFE");
                   content.removeAllViews();
 
-                  addCard(
-                          "Tu asistente LIFEAPP",
-                          "Salud, familia, agenda, música, viajes, compras y objetivos."
+                  addTitle("¿Qué necesitas?");
+
+                  TextView description = text(
+                          "Tu asistente para organizar salud, familia, agenda, música, viajes, compras y objetivos.",
+                          17,
+                          false,
+                          Color.rgb(71, 78, 96)
                   );
 
-                  addCard(
-                          "Ejemplo",
-                          "¿Qué tengo mañana?"
+                  LinearLayout.LayoutParams descriptionParams =
+                          new LinearLayout.LayoutParams(
+                                  ViewGroup.LayoutParams.MATCH_PARENT,
+                                  ViewGroup.LayoutParams.WRAP_CONTENT
+                          );
+
+                  descriptionParams.bottomMargin = dp(12);
+
+                  content.addView(
+                          description,
+                          descriptionParams
                   );
 
-                  addCard(
-                          "Ejemplo",
-                          "Organízame el próximo viaje"
-                  );
-
-                  addCard(
-                          "Ejemplo",
-                          "Añade leche a la compra"
-                  );
+                  addAskButton("Pon música para entrenar");
+                  addAskButton("¿Qué tengo mañana?");
+                  addAskButton("Organízame el próximo viaje");
+                  addAskButton("Añade leche a la compra");
               }
 
               private void showProfile() {
                   headerTitle.setText("Perfil");
                   content.removeAllViews();
 
-                  addCard("Cuenta", "LIFEAPP activa");
-                  addCard("Privacidad", "Tus datos bajo tu control");
-                  addCard("Sincronización", "Configurar servicios");
+                  addTitle("Tu LIFEAPP");
+
+                  addCard(
+                          "Cuenta",
+                          "LIFEAPP activa"
+                  );
+
+                  addCard(
+                          "Privacidad",
+                          "Tus datos bajo tu control"
+                  );
+
+                  addCard(
+                          "Sincronización",
+                          "Configurar servicios"
+                  );
               }
 
-              private void addCard(String title, String subtitle) {
+              private void addTitle(String value) {
+                  TextView title = text(
+                          value,
+                          20,
+                          true,
+                          Color.rgb(29, 35, 54)
+                  );
+
+                  title.setPadding(
+                          0,
+                          0,
+                          0,
+                          dp(12)
+                  );
+
+                  content.addView(title);
+              }
+
+              private void addCard(
+                      String title,
+                      String subtitle
+              ) {
 
                   LinearLayout card = new LinearLayout(this);
-                  card.setOrientation(LinearLayout.VERTICAL);
+
+                  card.setOrientation(
+                          LinearLayout.VERTICAL
+                  );
+
                   card.setPadding(
                           dp(18),
                           dp(15),
@@ -499,11 +626,20 @@ jobs:
                           dp(15)
                   );
 
-                  GradientDrawable background = new GradientDrawable();
-                  background.setColor(Color.WHITE);
-                  background.setCornerRadius(dp(20));
+                  GradientDrawable background =
+                          new GradientDrawable();
 
-                  card.setBackground(background);
+                  background.setColor(
+                          Color.WHITE
+                  );
+
+                  background.setCornerRadius(
+                          dp(20)
+                  );
+
+                  card.setBackground(
+                          background
+                  );
 
                   card.addView(
                           text(
@@ -514,13 +650,24 @@ jobs:
                           )
                   );
 
+                  TextView subtitleView = text(
+                          subtitle,
+                          14,
+                          false,
+                          Color.rgb(105, 112, 128)
+                  );
+
+                  LinearLayout.LayoutParams subtitleParams =
+                          new LinearLayout.LayoutParams(
+                                  ViewGroup.LayoutParams.MATCH_PARENT,
+                                  ViewGroup.LayoutParams.WRAP_CONTENT
+                          );
+
+                  subtitleParams.topMargin = dp(4);
+
                   card.addView(
-                          text(
-                                  subtitle,
-                                  14,
-                                  false,
-                                  Color.rgb(105, 112, 128)
-                          )
+                          subtitleView,
+                          subtitleParams
                   );
 
                   LinearLayout.LayoutParams params =
@@ -531,7 +678,34 @@ jobs:
 
                   params.bottomMargin = dp(11);
 
-                  content.addView(card, params);
+                  content.addView(
+                          card,
+                          params
+                  );
+              }
+
+              private void addAskButton(
+                      String label
+              ) {
+
+                  Button button = new Button(this);
+
+                  button.setText(label);
+                  button.setAllCaps(false);
+                  button.setTextSize(16);
+
+                  LinearLayout.LayoutParams params =
+                          new LinearLayout.LayoutParams(
+                                  ViewGroup.LayoutParams.MATCH_PARENT,
+                                  ViewGroup.LayoutParams.WRAP_CONTENT
+                          );
+
+                  params.bottomMargin = dp(10);
+
+                  content.addView(
+                          button,
+                          params
+                  );
               }
 
               private void addNav(
@@ -548,6 +722,7 @@ jobs:
                   );
 
                   nav.setGravity(Gravity.CENTER);
+
                   nav.setPadding(
                           dp(3),
                           dp(11),
@@ -555,7 +730,9 @@ jobs:
                           dp(11)
                   );
 
-                  nav.setOnClickListener(v -> action.run());
+                  nav.setOnClickListener(
+                          v -> action.run()
+                  );
 
                   LinearLayout.LayoutParams params =
                           new LinearLayout.LayoutParams(
@@ -564,7 +741,10 @@ jobs:
                                   1f
                           );
 
-                  parent.addView(nav, params);
+                  parent.addView(
+                          nav,
+                          params
+                  );
               }
 
               private TextView text(
@@ -574,20 +754,21 @@ jobs:
                       int color
               ) {
 
-                  TextView text = new TextView(this);
+                  TextView view =
+                          new TextView(this);
 
-                  text.setText(value);
-                  text.setTextSize(size);
-                  text.setTextColor(color);
+                  view.setText(value);
+                  view.setTextSize(size);
+                  view.setTextColor(color);
 
                   if (bold) {
-                      text.setTypeface(
+                      view.setTypeface(
                               Typeface.DEFAULT,
                               Typeface.BOLD
                       );
                   }
 
-                  return text;
+                  return view;
               }
 
               private int dp(int value) {
@@ -601,24 +782,48 @@ jobs:
           }
           EOF
 
-      - name: Build LIFEAPP APK with official Android toolchain
+      - name: Build LIFEAPP APK with official AAPT2
+        shell: bash
         run: |
+          set -e
+
           gradle :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk LIFEAPP-v3.0.apk
 
-      - name: Verify LIFEAPP icon
+          cp \
+            app/build/outputs/apk/debug/app-debug.apk \
+            LIFEAPP-v3.0.apk
+
+          ls -lh LIFEAPP-v3.0.apk
+
+      - name: Verify LIFEAPP launcher icon
+        shell: bash
         run: |
-          echo "===== APPLICATION ====="
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging LIFEAPP-v3.0.apk | \
-          grep -E "package:|application-label:|application-icon|launchable-activity"
+          set -e
 
-          echo "===== ICON RESOURCES ====="
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+
+          echo
+          echo "======================================"
+          echo "LIFEAPP PACKAGE"
+          echo "======================================"
+
+          "$AAPT" dump badging LIFEAPP-v3.0.apk | \
+          grep -E \
+          "package:|application-label:|application-icon|launchable-activity"
+
+          echo
+          echo "======================================"
+          echo "LIFEAPP ICON RESOURCES"
+          echo "======================================"
+
           unzip -l LIFEAPP-v3.0.apk | \
-          grep -E "ic_launcher|resources.arsc"
+          grep -E \
+          "ic_launcher|resources.arsc"
 
       - name: Upload LIFEAPP APK
         uses: actions/upload-artifact@v4
         with:
           name: LIFEAPP-v3.0-APK
           path: LIFEAPP-v3.0.apk
+          if-no-files-found: error
           retention-days: 30
