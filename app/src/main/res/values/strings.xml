@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">LIFEAPP</string>
+    <string name="ask_life_ai">ASK LIFE IA</string>
+    <string name="music">Música</string>
+    <string name="language">Idioma</string>
+    <string name="automatic">Automático (sistema)</string>
+    <string name="music_title">LIFEAPP Música</string>
+    <string name="music_subtitle">Tu música, todos tus servicios.</string>
+    <string name="connect">Conectar</string>
+    <string name="spotify">Spotify</string>
+    <string name="apple_music">Apple Music</string>
+    <string name="youtube_music">YouTube Music</string>
+    <string name="amazon_music">Amazon Music</string>
+    <string name="settings">Configuración</string>
+</resources>
