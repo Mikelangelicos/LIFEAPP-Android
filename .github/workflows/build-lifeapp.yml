@@ -1,4 +1,4 @@
-name: Build LIFEAPP v3.1 Restored
+name: Build LIFEAPP v3.2
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - main
     paths:
-      - "LIFEAPP-v3.1-restored-project.zip"
+      - "LIFEAPP-v3.2-source.zip"
       - ".github/workflows/build-lifeapp.yml"
 
 jobs:
@@ -28,98 +28,128 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Verify LIFEAPP project ZIP
+      - name: Verify LIFEAPP v3.2 source
         shell: bash
         run: |
           set -euxo pipefail
 
-          echo "Checking LIFEAPP v3.1 project..."
-          test -f LIFEAPP-v3.1-restored-project.zip
+          echo "Checking LIFEAPP v3.2 source..."
+          test -f LIFEAPP-v3.2-source.zip
 
           echo "ZIP found:"
-          ls -lh LIFEAPP-v3.1-restored-project.zip
+          ls -lh LIFEAPP-v3.2-source.zip
 
-      - name: Extract LIFEAPP v3.1 project
+      - name: Extract LIFEAPP v3.2
         shell: bash
         run: |
           set -euxo pipefail
 
-          rm -rf restored
-          mkdir -p restored
+          rm -rf lifeapp32
+          mkdir -p lifeapp32
 
-          unzip -q LIFEAPP-v3.1-restored-project.zip -d restored
+          unzip -q LIFEAPP-v3.2-source.zip -d lifeapp32
 
           echo "Project extracted."
           echo
-          echo "Project files:"
-          find restored -maxdepth 5 -type f | sort | head -200
+          echo "Files:"
+          find lifeapp32 -maxdepth 6 -type f | sort | head -250
 
       - name: Locate Android project
         shell: bash
         run: |
           set -euxo pipefail
 
-          PROJECT_DIR="$(find restored -type f -name settings.gradle.kts -printf '%h\n' | head -1)"
+          PROJECT_DIR="$(find lifeapp32 -type f -name settings.gradle.kts -printf '%h\n' | head -1)"
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "ERROR: settings.gradle.kts was not found."
             exit 1
           fi
 
-          echo "Android project located at:"
+          echo "Android project:"
           echo "$PROJECT_DIR"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Verify restored LIFEAPP files
+      - name: Verify LIFEAPP v3.2 project
         shell: bash
         run: |
           set -euxo pipefail
 
           cd "$PROJECT_DIR"
 
-          echo "Checking Android project..."
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
 
           echo
-          echo "Checking original LIFEAPP native library..."
+          echo "Core Android project OK."
+
+          echo
+          echo "Checking original LIFEAPP native engine..."
 
           LIFEAPP_SO="$(find app/src/main -type f -name liblifeapp.so | head -1)"
 
           if [ -z "$LIFEAPP_SO" ]; then
-            echo "ERROR: liblifeapp.so was not found."
+            echo "ERROR: original liblifeapp.so was not found."
             exit 1
           fi
 
-          echo "Found:"
+          echo "Native LIFEAPP engine:"
           echo "$LIFEAPP_SO"
           ls -lh "$LIFEAPP_SO"
 
           echo
-          echo "Checking original LIFEAPP launcher icon..."
+          echo "Checking LIFEAPP launcher icon..."
 
           LIFEAPP_ICON="$(find app/src/main/res -type f -name ic_launcher.png | head -1)"
 
           if [ -z "$LIFEAPP_ICON" ]; then
-            echo "ERROR: ic_launcher.png was not found."
+            echo "ERROR: LIFEAPP launcher icon was not found."
             exit 1
           fi
 
-          echo "Found:"
+          echo "Launcher icon:"
           echo "$LIFEAPP_ICON"
           ls -lh "$LIFEAPP_ICON"
 
-      - name: Build LIFEAPP v3.1 APK
+          echo
+          echo "Checking LIFEAPP v3.2 Java layer..."
+
+          JAVA_COUNT="$(find app/src/main -type f -name '*.java' | wc -l)"
+
+          echo "Java source files: $JAVA_COUNT"
+
+          if [ "$JAVA_COUNT" -lt 1 ]; then
+            echo "ERROR: LIFEAPP v3.2 Java layer was not found."
+            exit 1
+          fi
+
+      - name: Show LIFEAPP version configuration
         shell: bash
         run: |
           set -euxo pipefail
 
           cd "$PROJECT_DIR"
 
-          echo "Building LIFEAPP v3.1..."
+          echo "======================================"
+          echo "LIFEAPP VERSION CONFIGURATION"
+          echo "======================================"
+
+          grep -R \
+            -E "versionCode|versionName|applicationId|namespace" \
+            app/build.gradle.kts || true
+
+      - name: Build LIFEAPP v3.2 APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          cd "$PROJECT_DIR"
+
+          echo "Building LIFEAPP v3.2..."
+
           gradle :app:assembleDebug --stacktrace
 
           APK="$(find app/build/outputs/apk/debug -type f -name '*.apk' | head -1)"
@@ -129,25 +159,27 @@ jobs:
             exit 1
           fi
 
+          echo
           echo "APK generated:"
           echo "$APK"
+
           ls -lh "$APK"
 
-          cp "$APK" "$GITHUB_WORKSPACE/LIFEAPP-v3.1-restored.apk"
+          cp "$APK" "$GITHUB_WORKSPACE/LIFEAPP-v3.2.apk"
 
-      - name: Verify generated APK
+      - name: Verify LIFEAPP v3.2 APK
         shell: bash
         run: |
           set -euxo pipefail
 
-          test -f LIFEAPP-v3.1-restored.apk
+          test -f LIFEAPP-v3.2.apk
 
           echo
           echo "======================================"
-          echo "LIFEAPP v3.1 APK"
+          echo "LIFEAPP v3.2 APK"
           echo "======================================"
 
-          ls -lh LIFEAPP-v3.1-restored.apk
+          ls -lh LIFEAPP-v3.2.apk
 
           AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
 
@@ -164,29 +196,37 @@ jobs:
           echo "PACKAGE / VERSION / LAUNCHER"
           echo "======================================"
 
-          "$AAPT" dump badging LIFEAPP-v3.1-restored.apk | \
+          "$AAPT" dump badging LIFEAPP-v3.2.apk | \
             grep -E "package:|application-label:|application-icon|launchable-activity"
 
           echo
           echo "======================================"
-          echo "NATIVE LIFEAPP LIBRARY"
+          echo "NATIVE LIFEAPP ENGINE"
           echo "======================================"
 
-          unzip -l LIFEAPP-v3.1-restored.apk | \
+          unzip -l LIFEAPP-v3.2.apk | \
             grep "liblifeapp.so"
+
+          echo
+          echo "======================================"
+          echo "JAVA / DEX LAYER"
+          echo "======================================"
+
+          unzip -l LIFEAPP-v3.2.apk | \
+            grep -E "classes.*dex" || true
 
           echo
           echo "======================================"
           echo "ICON RESOURCES"
           echo "======================================"
 
-          unzip -l LIFEAPP-v3.1-restored.apk | \
+          unzip -l LIFEAPP-v3.2.apk | \
             grep -E "ic_launcher|resources.arsc" || true
 
-      - name: Upload LIFEAPP v3.1 APK
+      - name: Upload LIFEAPP v3.2 APK
         uses: actions/upload-artifact@v4
         with:
-          name: LIFEAPP-v3.1-restored-APK
-          path: LIFEAPP-v3.1-restored.apk
+          name: LIFEAPP-v3.2-APK
+          path: LIFEAPP-v3.2.apk
           if-no-files-found: error
           retention-days: 30
