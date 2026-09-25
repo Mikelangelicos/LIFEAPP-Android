@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -31,29 +32,57 @@ public class LifeAppActivity extends NativeActivity {
 
     private static final String ASK_LOADER =
             "<!doctype html>" +
-            "<html><head>" +
+            "<html>" +
+            "<head>" +
             "<meta charset='utf-8'>" +
             "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
+
             "<style>" +
-            "html,body{margin:0;height:100%;background:#0b0d14;color:white;" +
-            "font-family:system-ui}" +
-            "body{display:grid;place-items:center}" +
+
+            "html,body{" +
+            "margin:0;" +
+            "height:100%;" +
+            "background:#0b0d14;" +
+            "color:white;" +
+            "font-family:system-ui;" +
+            "}" +
+
+            "body{" +
+            "display:grid;" +
+            "place-items:center;" +
+            "}" +
+
             "</style>" +
-            "</head><body>" +
+
+            "</head>" +
+
+            "<body>" +
+
             "<div>Cargando ASK LIFE IA…</div>" +
+
             "<script>" +
+
             "fetch('" + ASK_UI_URL + "',{cache:'no-store'})" +
-            ".then(function(r){return r.text();})" +
+
+            ".then(function(r){" +
+            "return r.text();" +
+            "})" +
+
             ".then(function(h){" +
             "document.open();" +
             "document.write(h);" +
             "document.close();" +
             "})" +
+
             ".catch(function(){" +
-            "document.body.innerHTML='<div>No se pudo cargar ASK LIFE IA.</div>';" +
+            "document.body.innerHTML=" +
+            "'<div>No se pudo cargar ASK LIFE IA.</div>';" +
             "});" +
+
             "</script>" +
-            "</body></html>";
+
+            "</body>" +
+            "</html>";
 
     private Button contextualButton;
 
@@ -68,11 +97,20 @@ public class LifeAppActivity extends NativeActivity {
 
         super.onCreate(state);
 
-        contextualButton = new Button(this);
+        contextualButton =
+                new Button(this);
 
-        contextualButton.setText("⚙");
-        contextualButton.setTextSize(22f);
-        contextualButton.setVisibility(View.GONE);
+        contextualButton.setText(
+                "⚙"
+        );
+
+        contextualButton.setTextSize(
+                22f
+        );
+
+        contextualButton.setVisibility(
+                View.GONE
+        );
 
         contextualButton.setOnClickListener(v ->
                 startActivity(
@@ -103,20 +141,52 @@ public class LifeAppActivity extends NativeActivity {
         );
 
         /*
-         * Esperamos a que la interfaz nativa
-         * tenga ya sus dimensiones.
+         * Esperamos a que Android haya calculado
+         * las barras del sistema.
          */
         getWindow()
                 .getDecorView()
                 .postDelayed(
                         this::showAskLifeTab,
-                        700
+                        800
                 );
     }
 
     /**
-     * Coloca una ventana independiente encima
-     * del tercer botón de LIFEAPP.
+     * Devuelve la altura real de la barra
+     * inferior de navegación de Android.
+     */
+    private int getNavigationBarInset() {
+
+        View decor =
+                getWindow()
+                        .getDecorView();
+
+        WindowInsets insets =
+                decor.getRootWindowInsets();
+
+        if (insets == null) {
+            return 0;
+        }
+
+        if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.R
+        ) {
+
+            return insets
+                    .getInsets(
+                            WindowInsets.Type.navigationBars()
+                    )
+                    .bottom;
+        }
+
+        return insets.getStableInsetBottom();
+    }
+
+    /**
+     * Coloca el interceptor exactamente
+     * encima del botón ASK LIFE antiguo.
      */
     private void showAskLifeTab() {
 
@@ -158,6 +228,15 @@ public class LifeAppActivity extends NativeActivity {
         int tabWidth =
                 width / 4;
 
+        /*
+         * Esta es la clave del arreglo:
+         *
+         * subimos el PopupWindow por encima
+         * de la barra de navegación de Android.
+         */
+        int navigationInset =
+                getNavigationBarInset();
+
         FrameLayout root =
                 new FrameLayout(this);
 
@@ -165,12 +244,13 @@ public class LifeAppActivity extends NativeActivity {
                 Color.TRANSPARENT
         );
 
-        root.setClickable(true);
-        root.setFocusable(false);
+        root.setClickable(
+                true
+        );
 
         /*
-         * Texto que sustituye visualmente
-         * al ASK LIFE antiguo.
+         * Dejamos visible el + original,
+         * pero sustituimos el texto ASK LIFE.
          */
         TextView label =
                 new TextView(this);
@@ -197,16 +277,16 @@ public class LifeAppActivity extends NativeActivity {
 
         label.setBackgroundColor(
                 Color.rgb(
+                        250,
                         251,
-                        252,
-                        255
+                        254
                 )
         );
 
         FrameLayout.LayoutParams labelParams =
                 new FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
-                        dp(27),
+                        dp(25),
                         Gravity.BOTTOM
                 );
 
@@ -219,7 +299,7 @@ public class LifeAppActivity extends NativeActivity {
         );
 
         /*
-         * Toda la zona del tercer botón
+         * Cualquier toque en el tercer botón
          * abre ASK LIFE IA.
          */
         root.setOnClickListener(v ->
@@ -230,7 +310,7 @@ public class LifeAppActivity extends NativeActivity {
                 new PopupWindow(
                         root,
                         tabWidth,
-                        dp(86),
+                        dp(78),
                         false
                 );
 
@@ -248,17 +328,9 @@ public class LifeAppActivity extends NativeActivity {
                 false
         );
 
-        askTabPopup.setClippingEnabled(
-                false
-        );
-
-        askTabPopup.setElevation(
-                dp(10)
-        );
-
         /*
          * Los otros botones de LIFEAPP
-         * siguen funcionando normalmente.
+         * siguen funcionando.
          */
         if (
                 Build.VERSION.SDK_INT >=
@@ -270,21 +342,27 @@ public class LifeAppActivity extends NativeActivity {
             );
         }
 
+        askTabPopup.setElevation(
+                dp(12)
+        );
+
         /*
-         * El tercer botón comienza justo
-         * en la mitad del ancho.
+         * Tercer cuarto de la pantalla.
+         *
+         * Y ahora el borde inferior del popup
+         * queda justo ENCIMA de la barra
+         * de navegación del Samsung.
          */
         askTabPopup.showAtLocation(
                 decor,
                 Gravity.BOTTOM | Gravity.START,
                 width / 2,
-                0
+                navigationInset
         );
     }
 
     /**
-     * Abre ASK LIFE IA en una ventana
-     * completamente independiente.
+     * Abre el verdadero ASK LIFE IA.
      */
     private void openAskLife() {
 
@@ -336,10 +414,6 @@ public class LifeAppActivity extends NativeActivity {
                 false
         );
 
-        /*
-         * Permite al botón X de ASK LIFE IA
-         * volver a LIFEAPP.
-         */
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
                 "LifeApp"
@@ -349,36 +423,35 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
-        askDialog.setOnDismissListener(dialog -> {
+        askDialog.setOnDismissListener(
+                dialog -> {
 
-            if (askWebView != null) {
+                    if (askWebView != null) {
 
-                askWebView.removeJavascriptInterface(
-                        "LifeApp"
-                );
+                        askWebView.removeJavascriptInterface(
+                                "LifeApp"
+                        );
 
-                askWebView.destroy();
+                        askWebView.destroy();
 
-                askWebView = null;
-            }
+                        askWebView = null;
+                    }
 
-            getWindow()
-                    .getDecorView()
-                    .postDelayed(
-                            this::showAskLifeTab,
-                            200
-                    );
-        });
+                    getWindow()
+                            .getDecorView()
+                            .postDelayed(
+                                    this::showAskLifeTab,
+                                    250
+                            );
+                }
+        );
 
-        /*
-         * Botón Atrás:
-         * vuelve a LIFEAPP.
-         */
         askDialog.setOnKeyListener(
                 (dialog, keyCode, event) -> {
 
                     if (
-                            keyCode == KeyEvent.KEYCODE_BACK &&
+                            keyCode ==
+                                    KeyEvent.KEYCODE_BACK &&
                             event.getAction() ==
                                     KeyEvent.ACTION_UP
                     ) {
@@ -431,11 +504,6 @@ public class LifeAppActivity extends NativeActivity {
             );
         }
 
-        /*
-         * Cargador local:
-         * obtiene desde Supabase la interfaz
-         * actual de ASK LIFE IA.
-         */
         askWebView.loadDataWithBaseURL(
                 ASK_BASE_URL,
                 ASK_LOADER,
@@ -472,7 +540,7 @@ public class LifeAppActivity extends NativeActivity {
                 .getDecorView()
                 .postDelayed(
                         this::showAskLifeTab,
-                        300
+                        400
                 );
     }
 
