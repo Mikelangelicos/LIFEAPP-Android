@@ -5,6 +5,7 @@ import android.app.NativeActivity;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -36,9 +37,7 @@ public class LifeAppActivity extends NativeActivity {
             "<head>" +
             "<meta charset='utf-8'>" +
             "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
-
             "<style>" +
-
             "html,body{" +
             "margin:0;" +
             "height:100%;" +
@@ -46,41 +45,26 @@ public class LifeAppActivity extends NativeActivity {
             "color:white;" +
             "font-family:system-ui;" +
             "}" +
-
             "body{" +
             "display:grid;" +
             "place-items:center;" +
             "}" +
-
             "</style>" +
-
             "</head>" +
-
             "<body>" +
-
             "<div>Cargando ASK LIFE IA…</div>" +
-
             "<script>" +
-
             "fetch('" + ASK_UI_URL + "',{cache:'no-store'})" +
-
-            ".then(function(r){" +
-            "return r.text();" +
-            "})" +
-
-            ".then(function(h){" +
+            ".then(function(r){return r.text();})" +
+            ".then(function(html){" +
             "document.open();" +
-            "document.write(h);" +
+            "document.write(html);" +
             "document.close();" +
             "})" +
-
             ".catch(function(){" +
-            "document.body.innerHTML=" +
-            "'<div>No se pudo cargar ASK LIFE IA.</div>';" +
+            "document.body.innerHTML='<div>No se pudo cargar ASK LIFE IA.</div>';" +
             "});" +
-
             "</script>" +
-
             "</body>" +
             "</html>";
 
@@ -97,12 +81,26 @@ public class LifeAppActivity extends NativeActivity {
 
         super.onCreate(state);
 
+        buildContextButton();
+
+        /*
+         * Dejamos que NativeActivity termine
+         * primero de crear su Surface.
+         */
+        getWindow()
+                .getDecorView()
+                .postDelayed(
+                        this::showAskLifeTab,
+                        1200
+                );
+    }
+
+    private void buildContextButton() {
+
         contextualButton =
                 new Button(this);
 
-        contextualButton.setText(
-                "⚙"
-        );
+        contextualButton.setText("⚙");
 
         contextualButton.setTextSize(
                 22f
@@ -121,14 +119,14 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        FrameLayout.LayoutParams buttonParams =
+        FrameLayout.LayoutParams params =
                 new FrameLayout.LayoutParams(
                         dp(58),
                         dp(58),
                         Gravity.TOP | Gravity.END
                 );
 
-        buttonParams.setMargins(
+        params.setMargins(
                 0,
                 dp(18),
                 dp(14),
@@ -137,24 +135,13 @@ public class LifeAppActivity extends NativeActivity {
 
         addContentView(
                 contextualButton,
-                buttonParams
+                params
         );
-
-        /*
-         * Esperamos a que Android haya calculado
-         * las barras del sistema.
-         */
-        getWindow()
-                .getDecorView()
-                .postDelayed(
-                        this::showAskLifeTab,
-                        800
-                );
     }
 
     /**
-     * Devuelve la altura real de la barra
-     * inferior de navegación de Android.
+     * Altura de la barra de navegación
+     * del sistema Android.
      */
     private int getNavigationBarInset() {
 
@@ -171,7 +158,7 @@ public class LifeAppActivity extends NativeActivity {
 
         if (
                 Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.R
+                        Build.VERSION_CODES.R
         ) {
 
             return insets
@@ -185,8 +172,8 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Coloca el interceptor exactamente
-     * encima del botón ASK LIFE antiguo.
+     * Crea una ventana Android independiente
+     * justo encima del tercer botón inferior.
      */
     private void showAskLifeTab() {
 
@@ -215,92 +202,137 @@ public class LifeAppActivity extends NativeActivity {
         int width =
                 decor.getWidth();
 
-        if (width <= 0) {
+        int height =
+                decor.getHeight();
+
+        if (
+                width <= 0 ||
+                height <= 0
+        ) {
 
             decor.postDelayed(
                     this::showAskLifeTab,
-                    300
+                    400
             );
 
             return;
         }
 
+        int navigationInset =
+                getNavigationBarInset();
+
+        /*
+         * Cada pestaña ocupa 1/4
+         * del ancho de LIFEAPP.
+         */
         int tabWidth =
                 width / 4;
 
         /*
-         * Esta es la clave del arreglo:
-         *
-         * subimos el PopupWindow por encima
-         * de la barra de navegación de Android.
+         * Altura aproximada real
+         * de la barra de LIFEAPP.
          */
-        int navigationInset =
-                getNavigationBarInset();
+        int tabHeight =
+                Math.max(
+                        dp(52),
+                        Math.round(
+                                height * 0.055f
+                        )
+                );
+
+        /*
+         * Borde inferior útil de LIFEAPP:
+         * justo encima de la navegación Android.
+         */
+        int appBottom =
+                height - navigationInset;
+
+        /*
+         * Posición TOP absoluta.
+         *
+         * Ya NO utilizamos Gravity.BOTTOM.
+         */
+        int tabTop =
+                appBottom -
+                tabHeight -
+                dp(2);
+
+        if (tabTop < 0) {
+            tabTop = 0;
+        }
 
         FrameLayout root =
                 new FrameLayout(this);
 
-        root.setBackgroundColor(
-                Color.TRANSPARENT
+        root.setClickable(true);
+
+        root.setFocusable(false);
+
+        /*
+         * Fondo blanco ligeramente azulado,
+         * igual a la barra inferior.
+         */
+        GradientDrawable background =
+                new GradientDrawable();
+
+        background.setColor(
+                Color.rgb(
+                        249,
+                        251,
+                        255
+                )
         );
 
-        root.setClickable(
-                true
+        background.setCornerRadius(
+                dp(22)
+        );
+
+        root.setBackground(
+                background
         );
 
         /*
-         * Dejamos visible el + original,
-         * pero sustituimos el texto ASK LIFE.
+         * Texto inequívoco.
+         *
+         * Si esto está bien colocado,
+         * veremos ASK LIFE IA exactamente
+         * encima del ASK LIFE antiguo.
          */
         TextView label =
                 new TextView(this);
 
         label.setText(
-                "ASK LIFE IA"
-        );
-
-        label.setTextSize(
-                11f
+                "✦\nASK LIFE IA"
         );
 
         label.setGravity(
                 Gravity.CENTER
         );
 
+        label.setTextSize(
+                11f
+        );
+
         label.setTextColor(
                 Color.rgb(
-                        55,
-                        82,
-                        140
+                        43,
+                        78,
+                        145
                 )
         );
 
-        label.setBackgroundColor(
-                Color.rgb(
-                        250,
-                        251,
-                        254
-                )
-        );
-
-        FrameLayout.LayoutParams labelParams =
-                new FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        dp(25),
-                        Gravity.BOTTOM
-                );
-
-        labelParams.bottomMargin =
-                dp(3);
+        label.setClickable(false);
 
         root.addView(
                 label,
-                labelParams
+                new FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                )
         );
 
         /*
-         * Cualquier toque en el tercer botón
-         * abre ASK LIFE IA.
+         * El Popup completo es clicable.
          */
         root.setOnClickListener(v ->
                 openAskLife()
@@ -310,9 +342,25 @@ public class LifeAppActivity extends NativeActivity {
                 new PopupWindow(
                         root,
                         tabWidth,
-                        dp(78),
+                        tabHeight,
                         false
                 );
+
+        askTabPopup.setTouchable(
+                true
+        );
+
+        askTabPopup.setFocusable(
+                false
+        );
+
+        askTabPopup.setOutsideTouchable(
+                false
+        );
+
+        askTabPopup.setClippingEnabled(
+                false
+        );
 
         askTabPopup.setBackgroundDrawable(
                 new ColorDrawable(
@@ -320,49 +368,28 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        askTabPopup.setTouchable(
-                true
-        );
-
-        askTabPopup.setOutsideTouchable(
-                false
-        );
-
-        /*
-         * Los otros botones de LIFEAPP
-         * siguen funcionando.
-         */
-        if (
-                Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.Q
-        ) {
-
-            askTabPopup.setTouchModal(
-                    false
-            );
-        }
-
         askTabPopup.setElevation(
-                dp(12)
+                dp(20)
         );
 
         /*
-         * Tercer cuarto de la pantalla.
+         * Fundamental:
          *
-         * Y ahora el borde inferior del popup
-         * queda justo ENCIMA de la barra
-         * de navegación del Samsung.
+         * coordenadas absolutas desde ARRIBA.
+         *
+         * X = tercer cuarto.
+         * Y = justo encima de la navegación Android.
          */
         askTabPopup.showAtLocation(
                 decor,
-                Gravity.BOTTOM | Gravity.START,
+                Gravity.TOP | Gravity.START,
                 width / 2,
-                navigationInset
+                tabTop
         );
     }
 
     /**
-     * Abre el verdadero ASK LIFE IA.
+     * Abre ASK LIFE IA real.
      */
     private void openAskLife() {
 
@@ -423,6 +450,25 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
+        askDialog.setOnKeyListener(
+                (dialog, keyCode, event) -> {
+
+                    if (
+                            keyCode ==
+                                    KeyEvent.KEYCODE_BACK &&
+                            event.getAction() ==
+                                    KeyEvent.ACTION_UP
+                    ) {
+
+                        dialog.dismiss();
+
+                        return true;
+                    }
+
+                    return false;
+                }
+        );
+
         askDialog.setOnDismissListener(
                 dialog -> {
 
@@ -441,27 +487,8 @@ public class LifeAppActivity extends NativeActivity {
                             .getDecorView()
                             .postDelayed(
                                     this::showAskLifeTab,
-                                    250
+                                    300
                             );
-                }
-        );
-
-        askDialog.setOnKeyListener(
-                (dialog, keyCode, event) -> {
-
-                    if (
-                            keyCode ==
-                                    KeyEvent.KEYCODE_BACK &&
-                            event.getAction() ==
-                                    KeyEvent.ACTION_UP
-                    ) {
-
-                        dialog.dismiss();
-
-                        return true;
-                    }
-
-                    return false;
                 }
         );
 
@@ -540,22 +567,8 @@ public class LifeAppActivity extends NativeActivity {
                 .getDecorView()
                 .postDelayed(
                         this::showAskLifeTab,
-                        400
+                        700
                 );
-    }
-
-    @Override
-    protected void onPause() {
-
-        if (
-                askTabPopup != null &&
-                askTabPopup.isShowing()
-        ) {
-
-            askTabPopup.dismiss();
-        }
-
-        super.onPause();
     }
 
     @Override
@@ -575,6 +588,15 @@ public class LifeAppActivity extends NativeActivity {
         ) {
 
             askDialog.dismiss();
+        }
+
+        if (askWebView != null) {
+
+            askWebView.removeJavascriptInterface(
+                    "LifeApp"
+            );
+
+            askWebView.destroy();
         }
 
         super.onDestroy();
