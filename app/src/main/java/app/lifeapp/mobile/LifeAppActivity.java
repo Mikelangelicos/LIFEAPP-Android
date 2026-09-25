@@ -13,11 +13,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
-/**
- * Mantiene la interfaz original de LIFEAPP
- * y añade ASK LIFE IA gestionado desde Supabase.
- */
 public class LifeAppActivity extends NativeActivity {
 
     private static final String ASK_UI_URL =
@@ -26,20 +23,12 @@ public class LifeAppActivity extends NativeActivity {
     private static final String ASK_BASE_URL =
             "https://rtggrizfrkplropltwdc.supabase.co/";
 
-    /*
-     * Supabase convierte HTML devuelto por Edge Functions en text/plain.
-     *
-     * Por eso LIFEAPP descarga el contenido mediante fetch()
-     * y después lo renderiza dentro del WebView.
-     */
     private static final String ASK_LOADER =
             "<!doctype html>" +
             "<html>" +
             "<head>" +
             "<meta charset='utf-8'>" +
-            "<meta name='viewport' " +
-            "content='width=device-width,initial-scale=1'>" +
-
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
             "<style>" +
             "html,body{" +
             "margin:0;" +
@@ -48,40 +37,26 @@ public class LifeAppActivity extends NativeActivity {
             "color:white;" +
             "font-family:system-ui;" +
             "}" +
-
             "body{" +
             "display:grid;" +
             "place-items:center;" +
             "}" +
             "</style>" +
-
             "</head>" +
-
             "<body>" +
-
             "<div>Cargando ASK LIFE IA…</div>" +
-
             "<script>" +
-
             "fetch('" + ASK_UI_URL + "',{cache:'no-store'})" +
-
-            ".then(function(r){" +
-            "return r.text();" +
-            "})" +
-
+            ".then(function(r){return r.text();})" +
             ".then(function(html){" +
             "document.open();" +
             "document.write(html);" +
             "document.close();" +
             "})" +
-
             ".catch(function(){" +
-            "document.body.innerHTML=" +
-            "'<div>No se pudo cargar ASK LIFE IA.</div>';" +
+            "document.body.innerHTML='<div>No se pudo cargar ASK LIFE IA.</div>';" +
             "});" +
-
             "</script>" +
-
             "</body>" +
             "</html>";
 
@@ -90,14 +65,17 @@ public class LifeAppActivity extends NativeActivity {
     private FrameLayout askOverlay;
     private WebView askWebView;
 
+    /*
+     * Esta capa queda físicamente por encima
+     * del botón ASK LIFE de la interfaz nativa.
+     */
+    private FrameLayout askTabInterceptor;
+
     @Override
     protected void onCreate(Bundle state) {
 
         super.onCreate(state);
 
-        /*
-         * Botón contextual utilizado en Explorar / Perfil.
-         */
         contextualButton = new Button(this);
 
         contextualButton.setText("⚙");
@@ -132,32 +110,210 @@ public class LifeAppActivity extends NativeActivity {
                 buttonParams
         );
 
-        /*
-         * Preparamos ASK LIFE IA.
-         */
         buildAskLife();
+
+        /*
+         * Muy importante:
+         * creamos el interceptor DESPUÉS
+         * de la interfaz nativa.
+         */
+        installAskLifeTabInterceptor();
     }
 
     /**
-     * Detecta qué sección de la barra inferior
-     * original de LIFEAPP ha pulsado el usuario.
+     * Crea una zona Android encima del tercer
+     * botón de la navegación inferior.
+     *
+     * Al estar encima del SurfaceView nativo,
+     * LIFEAPP IA recibe el toque antes que
+     * la interfaz antigua.
      */
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
+    private void installAskLifeTabInterceptor() {
+
+        getWindow()
+                .getDecorView()
+                .post(() -> {
+
+                    if (askTabInterceptor != null) {
+                        positionAskLifeTabInterceptor();
+                        return;
+                    }
+
+                    askTabInterceptor =
+                            new FrameLayout(this);
+
+                    /*
+                     * El fondo principal es transparente
+                     * para conservar el icono original.
+                     */
+                    askTabInterceptor.setBackgroundColor(
+                            Color.TRANSPARENT
+                    );
+
+                    askTabInterceptor.setClickable(true);
+                    askTabInterceptor.setFocusable(true);
+
+                    askTabInterceptor.setOnClickListener(v ->
+                            showAskLife()
+                    );
+
+                    /*
+                     * Cubrimos únicamente el texto
+                     * ASK LIFE antiguo.
+                     */
+                    TextView label =
+                            new TextView(this);
+
+                    label.setText("ASK LIFE IA");
+
+                    label.setTextSize(11f);
+
+                    label.setGravity(
+                            Gravity.CENTER
+                    );
+
+                    label.setTextColor(
+                            Color.rgb(
+                                    58,
+                                    78,
+                                    120
+                            )
+                    );
+
+                    /*
+                     * Fondo prácticamente idéntico
+                     * al menú inferior original.
+                     */
+                    label.setBackgroundColor(
+                            Color.rgb(
+                                    252,
+                                    252,
+                                    253
+                            )
+                    );
+
+                    FrameLayout.LayoutParams labelParams =
+                            new FrameLayout.LayoutParams(
+                                    FrameLayout.LayoutParams.MATCH_PARENT,
+                                    dp(25),
+                                    Gravity.BOTTOM
+                            );
+
+                    labelParams.setMargins(
+                            0,
+                            0,
+                            0,
+                            dp(4)
+                    );
+
+                    askTabInterceptor.addView(
+                            label,
+                            labelParams
+                    );
+
+                    positionAskLifeTabInterceptor();
+
+                    /*
+                     * Garantizamos que quede encima
+                     * de la interfaz nativa.
+                     */
+                    askTabInterceptor.bringToFront();
+                });
+    }
+
+    private void positionAskLifeTabInterceptor() {
+
+        int width =
+                getWindow()
+                        .getDecorView()
+                        .getWidth();
+
+        if (width <= 0) {
+            return;
+        }
+
+        int tabWidth =
+                width / 4;
+
+        FrameLayout.LayoutParams params =
+                new FrameLayout.LayoutParams(
+                        tabWidth,
+                        dp(82),
+                        Gravity.BOTTOM | Gravity.START
+                );
 
         /*
-         * Si ASK LIFE IA está abierto,
-         * dejamos que WebView gestione los toques.
+         * Tercer botón:
+         *
+         * 0 - 25 %  Inicio
+         * 25 - 50 % Explorar
+         * 50 - 75 % ASK LIFE
+         * 75 - 100 % Perfil
+         */
+        params.leftMargin =
+                width / 2;
+
+        if (askTabInterceptor.getParent() == null) {
+
+            addContentView(
+                    askTabInterceptor,
+                    params
+            );
+
+        } else {
+
+            askTabInterceptor.setLayoutParams(
+                    params
+            );
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(
+            boolean hasFocus
+    ) {
+
+        super.onWindowFocusChanged(
+                hasFocus
+        );
+
+        if (
+                hasFocus &&
+                askTabInterceptor != null &&
+                askOverlay.getVisibility()
+                        != View.VISIBLE
+        ) {
+
+            positionAskLifeTabInterceptor();
+
+            askTabInterceptor.bringToFront();
+        }
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(
+            MotionEvent event
+    ) {
+
+        /*
+         * ASK LIFE IA abierto:
+         * WebView recibe los eventos.
          */
         if (
                 askOverlay != null &&
-                askOverlay.getVisibility() == View.VISIBLE
+                askOverlay.getVisibility()
+                        == View.VISIBLE
         ) {
 
-            return super.dispatchTouchEvent(event);
+            return super.dispatchTouchEvent(
+                    event
+            );
         }
 
-        if (event.getAction() == MotionEvent.ACTION_UP) {
+        if (
+                event.getAction()
+                        == MotionEvent.ACTION_UP
+        ) {
 
             int width =
                     getWindow()
@@ -169,22 +325,22 @@ public class LifeAppActivity extends NativeActivity {
                             .getDecorView()
                             .getHeight();
 
-            /*
-             * Barra inferior LIFEAPP.
-             */
             if (
                     width > 0 &&
                     height > 0 &&
-                    event.getY() > height * 0.86f
+                    event.getY()
+                            > height * 0.86f
             ) {
 
                 float section =
-                        event.getX() / width;
+                        event.getX()
+                                / width;
 
                 /*
-                 * ASK LIFE
+                 * Fallback adicional.
                  *
-                 * Tercer botón de la barra.
+                 * Normalmente el interceptor
+                 * ya habrá capturado este toque.
                  */
                 if (
                         section >= 0.50f &&
@@ -199,9 +355,13 @@ public class LifeAppActivity extends NativeActivity {
                 /*
                  * PERFIL
                  */
-                else if (section >= 0.75f) {
+                else if (
+                        section >= 0.75f
+                ) {
 
-                    contextualButton.setText("⚙");
+                    contextualButton.setText(
+                            "⚙"
+                    );
 
                     contextualButton.setOnClickListener(v ->
                             startActivity(
@@ -225,7 +385,9 @@ public class LifeAppActivity extends NativeActivity {
                         section < 0.50f
                 ) {
 
-                    contextualButton.setText("♫");
+                    contextualButton.setText(
+                            "♫"
+                    );
 
                     contextualButton.setOnClickListener(v ->
                             startActivity(
@@ -253,11 +415,13 @@ public class LifeAppActivity extends NativeActivity {
             }
         }
 
-        return super.dispatchTouchEvent(event);
+        return super.dispatchTouchEvent(
+                event
+        );
     }
 
     /**
-     * Crea la pantalla interna de ASK LIFE IA.
+     * Crea ASK LIFE IA.
      */
     private void buildAskLife() {
 
@@ -279,10 +443,6 @@ public class LifeAppActivity extends NativeActivity {
         askOverlay.setClickable(true);
         askOverlay.setFocusable(true);
 
-        /*
-         * WebView donde renderizamos
-         * la interfaz gestionada desde Supabase.
-         */
         askWebView =
                 new WebView(this);
 
@@ -301,31 +461,22 @@ public class LifeAppActivity extends NativeActivity {
         WebSettings settings =
                 askWebView.getSettings();
 
-        /*
-         * Necesario para el chat
-         * y la comunicación con Supabase.
-         */
-        settings.setJavaScriptEnabled(true);
+        settings.setJavaScriptEnabled(
+                true
+        );
 
-        /*
-         * Permite mantener el historial
-         * de conversación mediante localStorage.
-         */
-        settings.setDomStorageEnabled(true);
+        settings.setDomStorageEnabled(
+                true
+        );
 
-        /*
-         * No necesitamos acceso a archivos
-         * locales del dispositivo.
-         */
-        settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        settings.setAllowFileAccess(
+                false
+        );
 
-        /*
-         * Puente JavaScript -> Android.
-         *
-         * Permite que ASK LIFE IA pueda
-         * cerrar su pantalla y volver a LIFEAPP.
-         */
+        settings.setAllowContentAccess(
+                false
+        );
+
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
                 "LifeApp"
@@ -339,10 +490,6 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        /*
-         * Añadimos ASK LIFE IA encima
-         * de la interfaz nativa original.
-         */
         addContentView(
                 askOverlay,
                 new FrameLayout.LayoutParams(
@@ -365,12 +512,13 @@ public class LifeAppActivity extends NativeActivity {
                 View.VISIBLE
         );
 
+        /*
+         * Fundamental:
+         * el chat pasa por encima incluso
+         * del interceptor inferior.
+         */
         askOverlay.bringToFront();
 
-        /*
-         * Cargamos un pequeño HTML local
-         * que descarga la interfaz real desde Supabase.
-         */
         askWebView.loadDataWithBaseURL(
                 ASK_BASE_URL,
                 ASK_LOADER,
@@ -381,18 +529,23 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Cierra ASK LIFE IA.
+     * Vuelve a LIFEAPP.
      */
     private void hideAskLife() {
 
         askOverlay.setVisibility(
                 View.GONE
         );
+
+        /*
+         * Recuperamos el botón ASK LIFE IA.
+         */
+        if (askTabInterceptor != null) {
+
+            askTabInterceptor.bringToFront();
+        }
     }
 
-    /**
-     * Puente accesible desde JavaScript.
-     */
     private final class AskLifeBridge {
 
         @JavascriptInterface
@@ -404,29 +557,16 @@ public class LifeAppActivity extends NativeActivity {
         }
     }
 
-    /**
-     * Botón Atrás de Android.
-     */
     @Override
     public void onBackPressed() {
 
-        /*
-         * Si estamos dentro de ASK LIFE IA,
-         * primero cerramos ASK LIFE.
-         */
         if (
                 askOverlay != null &&
-                askOverlay.getVisibility() == View.VISIBLE
+                askOverlay.getVisibility()
+                        == View.VISIBLE
         ) {
 
-            if (askWebView.canGoBack()) {
-
-                askWebView.goBack();
-
-            } else {
-
-                hideAskLife();
-            }
+            hideAskLife();
 
             return;
         }
@@ -434,9 +574,6 @@ public class LifeAppActivity extends NativeActivity {
         super.onBackPressed();
     }
 
-    /**
-     * Liberamos WebView al cerrar LIFEAPP.
-     */
     @Override
     protected void onDestroy() {
 
@@ -452,9 +589,6 @@ public class LifeAppActivity extends NativeActivity {
         super.onDestroy();
     }
 
-    /**
-     * Conversión dp -> px.
-     */
     private int dp(int value) {
 
         return Math.round(
