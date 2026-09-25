@@ -28,6 +28,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: lifeapp-debug-keystore-v1
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -45,6 +51,14 @@ jobs:
 
       - name: Build LIFEAPP
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Show signing certificate
+        run: |
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android | grep -E "SHA256:|Owner:|Valid from:" || true
 
       - name: Prepare APK
         run: |
