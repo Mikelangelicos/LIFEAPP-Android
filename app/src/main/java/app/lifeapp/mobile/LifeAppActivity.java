@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.app.NativeActivity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -70,7 +71,16 @@ public class LifeAppActivity extends NativeActivity {
 
     private Button contextualButton;
 
-    private PopupWindow askTabPopup;
+    /*
+     * Botón grande ASK LIFE IA.
+     */
+    private PopupWindow askHomePopup;
+
+    /*
+     * Capa que oculta y bloquea
+     * la antigua pestaña inferior ASK LIFE.
+     */
+    private PopupWindow askBottomBlocker;
 
     private Dialog askDialog;
 
@@ -84,14 +94,14 @@ public class LifeAppActivity extends NativeActivity {
         buildContextButton();
 
         /*
-         * Dejamos que NativeActivity termine
-         * primero de crear su Surface.
+         * Esperamos a que la interfaz nativa
+         * ya esté completamente dibujada.
          */
         getWindow()
                 .getDecorView()
                 .postDelayed(
-                        this::showAskLifeTab,
-                        1200
+                        this::showAskControls,
+                        1000
                 );
     }
 
@@ -100,7 +110,9 @@ public class LifeAppActivity extends NativeActivity {
         contextualButton =
                 new Button(this);
 
-        contextualButton.setText("⚙");
+        contextualButton.setText(
+                "⚙"
+        );
 
         contextualButton.setTextSize(
                 22f
@@ -140,7 +152,7 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Altura de la barra de navegación
+     * Altura de la navegación inferior
      * del sistema Android.
      */
     private int getNavigationBarInset() {
@@ -158,7 +170,7 @@ public class LifeAppActivity extends NativeActivity {
 
         if (
                 Build.VERSION.SDK_INT >=
-                        Build.VERSION_CODES.R
+                Build.VERSION_CODES.R
         ) {
 
             return insets
@@ -172,25 +184,24 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Crea una ventana Android independiente
-     * justo encima del tercer botón inferior.
+     * Crea los dos elementos necesarios:
+     *
+     * 1. botón grande ASK LIFE IA
+     * 2. tapa invisible de la antigua pestaña inferior
      */
-    private void showAskLifeTab() {
+    private void showAskControls() {
 
         if (isFinishing()) {
             return;
         }
 
+        /*
+         * Si estamos dentro del chat,
+         * no mostramos las capas de Inicio.
+         */
         if (
                 askDialog != null &&
                 askDialog.isShowing()
-        ) {
-            return;
-        }
-
-        if (
-                askTabPopup != null &&
-                askTabPopup.isShowing()
         ) {
             return;
         }
@@ -211,27 +222,213 @@ public class LifeAppActivity extends NativeActivity {
         ) {
 
             decor.postDelayed(
-                    this::showAskLifeTab,
-                    400
+                    this::showAskControls,
+                    300
             );
 
+            return;
+        }
+
+        showBigAskButton(
+                decor,
+                width,
+                height
+        );
+
+        hideBottomAskTab(
+                decor,
+                width,
+                height
+        );
+    }
+
+    /**
+     * Sustituye visualmente el botón grande
+     * ASK LIFE original.
+     *
+     * Conservamos el estilo degradado,
+     * pero ahora pone ASK LIFE IA.
+     */
+    private void showBigAskButton(
+            View decor,
+            int width,
+            int height
+    ) {
+
+        if (
+                askHomePopup != null &&
+                askHomePopup.isShowing()
+        ) {
+            return;
+        }
+
+        /*
+         * Medidas obtenidas de la interfaz LIFEAPP.
+         */
+        int buttonWidth =
+                Math.round(
+                        width * 0.74f
+                );
+
+        int buttonHeight =
+                Math.max(
+                        dp(54),
+                        Math.round(
+                                height * 0.038f
+                        )
+                );
+
+        int left =
+                Math.round(
+                        width * 0.13f
+                );
+
+        /*
+         * Posición del botón grande de Inicio.
+         */
+        int top =
+                Math.round(
+                        height * 0.778f
+                );
+
+        TextView button =
+                new TextView(this);
+
+        button.setText(
+                "ASK LIFE IA"
+        );
+
+        button.setGravity(
+                Gravity.CENTER
+        );
+
+        button.setTextColor(
+                Color.WHITE
+        );
+
+        button.setTextSize(
+                22f
+        );
+
+        button.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        /*
+         * Degradado azul → violeta → rosa,
+         * siguiendo el diseño original LIFEAPP.
+         */
+        GradientDrawable gradient =
+                new GradientDrawable(
+                        GradientDrawable.Orientation.LEFT_RIGHT,
+                        new int[] {
+                                Color.rgb(
+                                        35,
+                                        169,
+                                        245
+                                ),
+                                Color.rgb(
+                                        108,
+                                        82,
+                                        226
+                                ),
+                                Color.rgb(
+                                        239,
+                                        44,
+                                        155
+                                )
+                        }
+                );
+
+        gradient.setCornerRadius(
+                dp(28)
+        );
+
+        button.setBackground(
+                gradient
+        );
+
+        button.setElevation(
+                dp(8)
+        );
+
+        /*
+         * El botón grande abre
+         * directamente ASK LIFE IA.
+         */
+        button.setOnClickListener(v ->
+                openAskLife()
+        );
+
+        askHomePopup =
+                new PopupWindow(
+                        button,
+                        buttonWidth,
+                        buttonHeight,
+                        false
+                );
+
+        askHomePopup.setTouchable(
+                true
+        );
+
+        askHomePopup.setFocusable(
+                false
+        );
+
+        askHomePopup.setOutsideTouchable(
+                false
+        );
+
+        askHomePopup.setClippingEnabled(
+                false
+        );
+
+        askHomePopup.setBackgroundDrawable(
+                new ColorDrawable(
+                        Color.TRANSPARENT
+                )
+        );
+
+        askHomePopup.setElevation(
+                dp(12)
+        );
+
+        askHomePopup.showAtLocation(
+                decor,
+                Gravity.TOP | Gravity.START,
+                left,
+                top
+        );
+    }
+
+    /**
+     * Oculta completamente la antigua
+     * pestaña pequeña ASK LIFE de abajo.
+     *
+     * No mostramos ASK LIFE IA aquí.
+     * Solo queda el botón grande.
+     */
+    private void hideBottomAskTab(
+            View decor,
+            int width,
+            int height
+    ) {
+
+        if (
+                askBottomBlocker != null &&
+                askBottomBlocker.isShowing()
+        ) {
             return;
         }
 
         int navigationInset =
                 getNavigationBarInset();
 
-        /*
-         * Cada pestaña ocupa 1/4
-         * del ancho de LIFEAPP.
-         */
         int tabWidth =
                 width / 4;
 
-        /*
-         * Altura aproximada real
-         * de la barra de LIFEAPP.
-         */
         int tabHeight =
                 Math.max(
                         dp(52),
@@ -240,18 +437,10 @@ public class LifeAppActivity extends NativeActivity {
                         )
                 );
 
-        /*
-         * Borde inferior útil de LIFEAPP:
-         * justo encima de la navegación Android.
-         */
         int appBottom =
-                height - navigationInset;
+                height -
+                navigationInset;
 
-        /*
-         * Posición TOP absoluta.
-         *
-         * Ya NO utilizamos Gravity.BOTTOM.
-         */
         int tabTop =
                 appBottom -
                 tabHeight -
@@ -261,21 +450,22 @@ public class LifeAppActivity extends NativeActivity {
             tabTop = 0;
         }
 
-        FrameLayout root =
+        /*
+         * Capa limpia del mismo tono
+         * que la barra inferior.
+         */
+        FrameLayout blank =
                 new FrameLayout(this);
 
-        root.setClickable(true);
+        blank.setClickable(
+                true
+        );
 
-        root.setFocusable(false);
+        blank.setFocusable(
+                false
+        );
 
-        /*
-         * Fondo blanco ligeramente azulado,
-         * igual a la barra inferior.
-         */
-        GradientDrawable background =
-                new GradientDrawable();
-
-        background.setColor(
+        blank.setBackgroundColor(
                 Color.rgb(
                         249,
                         251,
@@ -283,104 +473,54 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        background.setCornerRadius(
-                dp(22)
-        );
-
-        root.setBackground(
-                background
-        );
-
         /*
-         * Texto inequívoco.
+         * Consumimos el toque.
          *
-         * Si esto está bien colocado,
-         * veremos ASK LIFE IA exactamente
-         * encima del ASK LIFE antiguo.
+         * Así la antigua pestaña ASK LIFE
+         * tampoco puede abrirse accidentalmente.
          */
-        TextView label =
-                new TextView(this);
+        blank.setOnClickListener(v -> {
+            // Intencionadamente vacío.
+        });
 
-        label.setText(
-                "✦\nASK LIFE IA"
-        );
-
-        label.setGravity(
-                Gravity.CENTER
-        );
-
-        label.setTextSize(
-                11f
-        );
-
-        label.setTextColor(
-                Color.rgb(
-                        43,
-                        78,
-                        145
-                )
-        );
-
-        label.setClickable(false);
-
-        root.addView(
-                label,
-                new FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                )
-        );
-
-        /*
-         * El Popup completo es clicable.
-         */
-        root.setOnClickListener(v ->
-                openAskLife()
-        );
-
-        askTabPopup =
+        askBottomBlocker =
                 new PopupWindow(
-                        root,
+                        blank,
                         tabWidth,
                         tabHeight,
                         false
                 );
 
-        askTabPopup.setTouchable(
+        askBottomBlocker.setTouchable(
                 true
         );
 
-        askTabPopup.setFocusable(
+        askBottomBlocker.setFocusable(
                 false
         );
 
-        askTabPopup.setOutsideTouchable(
+        askBottomBlocker.setOutsideTouchable(
                 false
         );
 
-        askTabPopup.setClippingEnabled(
+        askBottomBlocker.setClippingEnabled(
                 false
         );
 
-        askTabPopup.setBackgroundDrawable(
+        askBottomBlocker.setBackgroundDrawable(
                 new ColorDrawable(
                         Color.TRANSPARENT
                 )
         );
 
-        askTabPopup.setElevation(
-                dp(20)
+        askBottomBlocker.setElevation(
+                dp(10)
         );
 
         /*
-         * Fundamental:
-         *
-         * coordenadas absolutas desde ARRIBA.
-         *
-         * X = tercer cuarto.
-         * Y = justo encima de la navegación Android.
+         * Tercer cuarto de la barra inferior.
          */
-        askTabPopup.showAtLocation(
+        askBottomBlocker.showAtLocation(
                 decor,
                 Gravity.TOP | Gravity.START,
                 width / 2,
@@ -389,17 +529,34 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Abre ASK LIFE IA real.
+     * Oculta las capas de Inicio
+     * mientras ASK LIFE IA está abierto.
+     */
+    private void dismissAskControls() {
+
+        if (
+                askHomePopup != null &&
+                askHomePopup.isShowing()
+        ) {
+
+            askHomePopup.dismiss();
+        }
+
+        if (
+                askBottomBlocker != null &&
+                askBottomBlocker.isShowing()
+        ) {
+
+            askBottomBlocker.dismiss();
+        }
+    }
+
+    /**
+     * Abre ASK LIFE IA.
      */
     private void openAskLife() {
 
-        if (
-                askTabPopup != null &&
-                askTabPopup.isShowing()
-        ) {
-
-            askTabPopup.dismiss();
-        }
+        dismissAskControls();
 
         askDialog =
                 new Dialog(
@@ -441,6 +598,10 @@ public class LifeAppActivity extends NativeActivity {
                 false
         );
 
+        /*
+         * Puente para que la X del chat
+         * pueda cerrar ASK LIFE IA.
+         */
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
                 "LifeApp"
@@ -450,14 +611,19 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
+        /*
+         * Botón Atrás:
+         * cerramos ASK LIFE IA
+         * y volvemos a LIFEAPP.
+         */
         askDialog.setOnKeyListener(
                 (dialog, keyCode, event) -> {
 
                     if (
                             keyCode ==
-                                    KeyEvent.KEYCODE_BACK &&
+                            KeyEvent.KEYCODE_BACK &&
                             event.getAction() ==
-                                    KeyEvent.ACTION_UP
+                            KeyEvent.ACTION_UP
                     ) {
 
                         dialog.dismiss();
@@ -480,14 +646,19 @@ public class LifeAppActivity extends NativeActivity {
 
                         askWebView.destroy();
 
-                        askWebView = null;
+                        askWebView =
+                                null;
                     }
 
+                    /*
+                     * Al volver a Inicio
+                     * reaparece el botón grande.
+                     */
                     getWindow()
                             .getDecorView()
                             .postDelayed(
-                                    this::showAskLifeTab,
-                                    300
+                                    this::showAskControls,
+                                    250
                             );
                 }
         );
@@ -531,6 +702,10 @@ public class LifeAppActivity extends NativeActivity {
             );
         }
 
+        /*
+         * Cargamos la interfaz remota
+         * gestionada desde Supabase.
+         */
         askWebView.loadDataWithBaseURL(
                 ASK_BASE_URL,
                 ASK_LOADER,
@@ -566,21 +741,15 @@ public class LifeAppActivity extends NativeActivity {
         getWindow()
                 .getDecorView()
                 .postDelayed(
-                        this::showAskLifeTab,
-                        700
+                        this::showAskControls,
+                        600
                 );
     }
 
     @Override
     protected void onDestroy() {
 
-        if (
-                askTabPopup != null &&
-                askTabPopup.isShowing()
-        ) {
-
-            askTabPopup.dismiss();
-        }
+        dismissAskControls();
 
         if (
                 askDialog != null &&
