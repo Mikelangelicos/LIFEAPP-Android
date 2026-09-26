@@ -9,8 +9,10 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -21,6 +23,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
@@ -77,14 +80,16 @@ public class LifeAppActivity extends NativeActivity {
     private PopupWindow askHomePopup;
 
     /*
-     * Capa que oculta y bloquea
-     * la antigua pestaña inferior ASK LIFE.
+     * Barra inferior visual reconstruida:
+     * INICIO · EXPLORAR · PERFIL.
      */
     private PopupWindow askBottomBlocker;
 
     private Dialog askDialog;
 
     private WebView askWebView;
+
+    private int activeNavIndex = 0;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -94,15 +99,17 @@ public class LifeAppActivity extends NativeActivity {
         buildContextButton();
 
         /*
-         * Esperamos a que la interfaz nativa
-         * ya esté completamente dibujada.
+         * No esperamos 1 segundo.
+         *
+         * El retraso anterior hacía visible durante un instante
+         * el antiguo botón "Ask LIFE" antes de dibujar "ASK LIFE IA".
          */
         getWindow()
                 .getDecorView()
-                .postDelayed(
-                        this::showAskControls,
-                        1000
-                );
+                .post(() -> {
+                    applyNativeContentInsets();
+                    showAskControls();
+                });
     }
 
     private void buildContextButton() {
@@ -184,21 +191,88 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Crea los dos elementos necesarios:
+     * Altura de la barra de estado.
+     */
+    private int getStatusBarInset() {
+
+        View decor =
+                getWindow()
+                        .getDecorView();
+
+        WindowInsets insets =
+                decor.getRootWindowInsets();
+
+        if (insets == null) {
+            return 0;
+        }
+
+        if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.R
+        ) {
+
+            return insets
+                    .getInsets(
+                            WindowInsets.Type.statusBars()
+                    )
+                    .top;
+        }
+
+        return insets.getStableInsetTop();
+    }
+
+    /**
+     * Android 16 fuerza edge-to-edge para targetSdk 36.
+     *
+     * LIFEAPP usa una superficie nativa, así que compensamos
+     * explícitamente las barras del sistema para evitar que la fila
+     * superior (Hola, indicador amarillo, etc.) quede demasiado arriba.
+     */
+    private void applyNativeContentInsets() {
+
+        View content =
+                findViewById(
+                        android.R.id.content
+                );
+
+        if (content == null) {
+            return;
+        }
+
+        int top =
+                getStatusBarInset();
+
+        int bottom =
+                getNavigationBarInset();
+
+        if (
+                content.getPaddingTop() != top ||
+                content.getPaddingBottom() != bottom
+        ) {
+
+            content.setPadding(
+                    0,
+                    top,
+                    0,
+                    bottom
+            );
+        }
+    }
+
+    /**
+     * Crea:
      *
      * 1. botón grande ASK LIFE IA
-     * 2. tapa invisible de la antigua pestaña inferior
+     * 2. navegación inferior centrada sin la antigua pestaña ASK LIFE
      */
     private void showAskControls() {
+
+        applyNativeContentInsets();
 
         if (isFinishing()) {
             return;
         }
 
-        /*
-         * Si estamos dentro del chat,
-         * no mostramos las capas de Inicio.
-         */
         if (
                 askDialog != null &&
                 askDialog.isShowing()
@@ -223,7 +297,7 @@ public class LifeAppActivity extends NativeActivity {
 
             decor.postDelayed(
                     this::showAskControls,
-                    300
+                    150
             );
 
             return;
@@ -243,11 +317,7 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Sustituye visualmente el botón grande
-     * ASK LIFE original.
-     *
-     * Conservamos el estilo degradado,
-     * pero ahora pone ASK LIFE IA.
+     * Sustituye visualmente el botón grande ASK LIFE original.
      */
     private void showBigAskButton(
             View decor,
@@ -262,9 +332,6 @@ public class LifeAppActivity extends NativeActivity {
             return;
         }
 
-        /*
-         * Medidas obtenidas de la interfaz LIFEAPP.
-         */
         int buttonWidth =
                 Math.round(
                         width * 0.74f
@@ -283,12 +350,28 @@ public class LifeAppActivity extends NativeActivity {
                         width * 0.13f
                 );
 
+        int statusInset =
+                getStatusBarInset();
+
+        int navigationInset =
+                getNavigationBarInset();
+
+        int usableHeight =
+                Math.max(
+                        1,
+                        height -
+                        statusInset -
+                        navigationInset
+                );
+
         /*
-         * Posición del botón grande de Inicio.
+         * Posición calculada dentro del área útil,
+         * no debajo de las barras del sistema.
          */
         int top =
+                statusInset +
                 Math.round(
-                        height * 0.778f
+                        usableHeight * 0.778f
                 );
 
         TextView button =
@@ -315,10 +398,6 @@ public class LifeAppActivity extends NativeActivity {
                 Typeface.BOLD
         );
 
-        /*
-         * Degradado azul → violeta → rosa,
-         * siguiendo el diseño original LIFEAPP.
-         */
         GradientDrawable gradient =
                 new GradientDrawable(
                         GradientDrawable.Orientation.LEFT_RIGHT,
@@ -353,10 +432,6 @@ public class LifeAppActivity extends NativeActivity {
                 dp(8)
         );
 
-        /*
-         * El botón grande abre
-         * directamente ASK LIFE IA.
-         */
         button.setOnClickListener(v ->
                 openAskLife()
         );
@@ -404,11 +479,12 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Oculta completamente la antigua
-     * pestaña pequeña ASK LIFE de abajo.
+     * Oculta la barra inferior nativa de cuatro huecos y la sustituye
+     * visualmente por tres destinos centrados.
      *
-     * No mostramos ASK LIFE IA aquí.
-     * Solo queda el botón grande.
+     * Los toques se reenvían a las posiciones nativas originales,
+     * por lo que conservamos la navegación existente sin modificar
+     * liblifeapp.so.
      */
     private void hideBottomAskTab(
             View decor,
@@ -426,14 +502,11 @@ public class LifeAppActivity extends NativeActivity {
         int navigationInset =
                 getNavigationBarInset();
 
-        int tabWidth =
-                width / 4;
-
         int tabHeight =
                 Math.max(
-                        dp(52),
+                        dp(58),
                         Math.round(
-                                height * 0.055f
+                                height * 0.060f
                         )
                 );
 
@@ -443,29 +516,24 @@ public class LifeAppActivity extends NativeActivity {
 
         int tabTop =
                 appBottom -
-                tabHeight -
-                dp(2);
+                tabHeight;
 
         if (tabTop < 0) {
             tabTop = 0;
         }
 
-        /*
-         * Capa limpia del mismo tono
-         * que la barra inferior.
-         */
-        FrameLayout blank =
-                new FrameLayout(this);
+        LinearLayout nav =
+                new LinearLayout(this);
 
-        blank.setClickable(
-                true
+        nav.setOrientation(
+                LinearLayout.HORIZONTAL
         );
 
-        blank.setFocusable(
-                false
+        nav.setGravity(
+                Gravity.CENTER
         );
 
-        blank.setBackgroundColor(
+        nav.setBackgroundColor(
                 Color.rgb(
                         249,
                         251,
@@ -473,20 +541,40 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        /*
-         * Consumimos el toque.
-         *
-         * Así la antigua pestaña ASK LIFE
-         * tampoco puede abrirse accidentalmente.
-         */
-        blank.setOnClickListener(v -> {
-            // Intencionadamente vacío.
-        });
+        addCenteredNavItem(
+                nav,
+                "INICIO",
+                0,
+                decor,
+                width,
+                height,
+                0.125f
+        );
+
+        addCenteredNavItem(
+                nav,
+                "EXPLORAR",
+                1,
+                decor,
+                width,
+                height,
+                0.375f
+        );
+
+        addCenteredNavItem(
+                nav,
+                "PERFIL",
+                2,
+                decor,
+                width,
+                height,
+                0.875f
+        );
 
         askBottomBlocker =
                 new PopupWindow(
-                        blank,
-                        tabWidth,
+                        nav,
+                        width,
                         tabHeight,
                         false
                 );
@@ -517,15 +605,204 @@ public class LifeAppActivity extends NativeActivity {
                 dp(10)
         );
 
-        /*
-         * Tercer cuarto de la barra inferior.
-         */
         askBottomBlocker.showAtLocation(
                 decor,
                 Gravity.TOP | Gravity.START,
-                width / 2,
+                0,
                 tabTop
         );
+    }
+
+    private void addCenteredNavItem(
+            LinearLayout nav,
+            String title,
+            int index,
+            View decor,
+            int width,
+            int height,
+            float nativeXFraction
+    ) {
+
+        TextView item =
+                new TextView(this);
+
+        item.setGravity(
+                Gravity.CENTER
+        );
+
+        item.setTextSize(
+                11.5f
+        );
+
+        item.setTypeface(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+        );
+
+        item.setOnClickListener(v -> {
+
+            activeNavIndex =
+                    index;
+
+            refreshBottomNav();
+
+            dispatchNativeNavTap(
+                    decor,
+                    width,
+                    height,
+                    nativeXFraction
+            );
+        });
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        1f
+                );
+
+        nav.addView(
+                item,
+                params
+        );
+
+        styleNavItem(
+                item,
+                title,
+                index == activeNavIndex
+        );
+    }
+
+    private void styleNavItem(
+            TextView item,
+            String title,
+            boolean selected
+    ) {
+
+        item.setText(
+                (selected ? "●\n" : "○\n") +
+                title
+        );
+
+        item.setTextColor(
+                selected
+                        ? Color.rgb(
+                                108,
+                                82,
+                                226
+                        )
+                        : Color.rgb(
+                                92,
+                                99,
+                                115
+                        )
+        );
+    }
+
+    private void refreshBottomNav() {
+
+        if (
+                askBottomBlocker == null ||
+                !askBottomBlocker.isShowing()
+        ) {
+            return;
+        }
+
+        View content =
+                askBottomBlocker.getContentView();
+
+        if (!(content instanceof LinearLayout)) {
+            return;
+        }
+
+        LinearLayout nav =
+                (LinearLayout) content;
+
+        String[] titles = {
+                "INICIO",
+                "EXPLORAR",
+                "PERFIL"
+        };
+
+        for (
+                int i = 0;
+                i < nav.getChildCount() &&
+                i < titles.length;
+                i++
+        ) {
+
+            View child =
+                    nav.getChildAt(i);
+
+            if (child instanceof TextView) {
+
+                styleNavItem(
+                        (TextView) child,
+                        titles[i],
+                        i == activeNavIndex
+                );
+            }
+        }
+    }
+
+    /**
+     * Envía el toque a la posición original de la barra nativa.
+     */
+    private void dispatchNativeNavTap(
+            View decor,
+            int width,
+            int height,
+            float xFraction
+    ) {
+
+        int navigationInset =
+                getNavigationBarInset();
+
+        int appBottom =
+                height -
+                navigationInset;
+
+        int y =
+                appBottom -
+                dp(30);
+
+        float x =
+                width *
+                xFraction;
+
+        long now =
+                SystemClock.uptimeMillis();
+
+        MotionEvent down =
+                MotionEvent.obtain(
+                        now,
+                        now,
+                        MotionEvent.ACTION_DOWN,
+                        x,
+                        y,
+                        0
+                );
+
+        MotionEvent up =
+                MotionEvent.obtain(
+                        now,
+                        now + 40,
+                        MotionEvent.ACTION_UP,
+                        x,
+                        y,
+                        0
+                );
+
+        decor.dispatchTouchEvent(
+                down
+        );
+
+        decor.dispatchTouchEvent(
+                up
+        );
+
+        down.recycle();
+        up.recycle();
     }
 
     /**
@@ -598,10 +875,6 @@ public class LifeAppActivity extends NativeActivity {
                 false
         );
 
-        /*
-         * Puente para que la X del chat
-         * pueda cerrar ASK LIFE IA.
-         */
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
                 "LifeApp"
@@ -611,11 +884,6 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
-        /*
-         * Botón Atrás:
-         * cerramos ASK LIFE IA
-         * y volvemos a LIFEAPP.
-         */
         askDialog.setOnKeyListener(
                 (dialog, keyCode, event) -> {
 
@@ -651,14 +919,13 @@ public class LifeAppActivity extends NativeActivity {
                     }
 
                     /*
-                     * Al volver a Inicio
-                     * reaparece el botón grande.
+                     * Reponemos las capas en el siguiente frame.
+                     * Ya no hay un periodo visible con el antiguo Ask LIFE.
                      */
                     getWindow()
                             .getDecorView()
-                            .postDelayed(
-                                    this::showAskControls,
-                                    250
+                            .post(
+                                    this::showAskControls
                             );
                 }
         );
@@ -702,10 +969,6 @@ public class LifeAppActivity extends NativeActivity {
             );
         }
 
-        /*
-         * Cargamos la interfaz remota
-         * gestionada desde Supabase.
-         */
         askWebView.loadDataWithBaseURL(
                 ASK_BASE_URL,
                 ASK_LOADER,
@@ -740,10 +1003,30 @@ public class LifeAppActivity extends NativeActivity {
 
         getWindow()
                 .getDecorView()
-                .postDelayed(
-                        this::showAskControls,
-                        600
-                );
+                .post(() -> {
+                    applyNativeContentInsets();
+                    showAskControls();
+                });
+    }
+
+    @Override
+    public void onWindowFocusChanged(
+            boolean hasFocus
+    ) {
+
+        super.onWindowFocusChanged(
+                hasFocus
+        );
+
+        if (hasFocus) {
+
+            getWindow()
+                    .getDecorView()
+                    .post(() -> {
+                        applyNativeContentInsets();
+                        showAskControls();
+                    });
+        }
     }
 
     @Override
