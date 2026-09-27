@@ -73,13 +73,14 @@ public class LifeAppActivity extends NativeActivity {
     private Button contextualButton;
 
     /*
-     * Botón grande ASK LIFE IA.
+     * Popup que tapa completamente el ASK LIFE nativo
+     * y muestra un único ASK LIFE IA.
      */
     private PopupWindow askHomePopup;
 
     /*
-     * Oculta únicamente la antigua pestaña
-     * pequeña ASK LIFE de la navegación inferior.
+     * Oculta solamente la antigua pestaña pequeña
+     * ASK LIFE de la navegación inferior.
      */
     private PopupWindow askBottomBlocker;
 
@@ -87,12 +88,6 @@ public class LifeAppActivity extends NativeActivity {
 
     private WebView askWebView;
 
-    /*
-     * Controlamos si estamos en Inicio.
-     *
-     * ASK LIFE IA grande solamente debe
-     * mostrarse en esta sección.
-     */
     private boolean isHomeSection = true;
 
     @Override
@@ -158,10 +153,6 @@ public class LifeAppActivity extends NativeActivity {
         );
     }
 
-    /**
-     * Altura de la barra de navegación
-     * del sistema Android.
-     */
     private int getNavigationBarInset() {
 
         View decor =
@@ -190,9 +181,6 @@ public class LifeAppActivity extends NativeActivity {
         return insets.getStableInsetBottom();
     }
 
-    /**
-     * Altura de la barra de estado.
-     */
     private int getStatusBarInset() {
 
         View decor =
@@ -221,9 +209,6 @@ public class LifeAppActivity extends NativeActivity {
         return insets.getStableInsetTop();
     }
 
-    /**
-     * Ajuste para Android 16 / edge-to-edge.
-     */
     private void applyNativeContentInsets() {
 
         View content =
@@ -255,9 +240,6 @@ public class LifeAppActivity extends NativeActivity {
         }
     }
 
-    /**
-     * Gestiona las capas añadidas sobre LIFEAPP.
-     */
     private void showAskControls() {
 
         applyNativeContentInsets();
@@ -290,26 +272,18 @@ public class LifeAppActivity extends NativeActivity {
 
             decor.postDelayed(
                     this::showAskControls,
-                    150
+                    120
             );
 
             return;
         }
 
-        /*
-         * La antigua pestaña inferior
-         * ASK LIFE permanece oculta siempre.
-         */
         hideBottomAskTab(
                 decor,
                 width,
                 height
         );
 
-        /*
-         * El botón grande solamente aparece
-         * en la pantalla INICIO.
-         */
         if (isHomeSection) {
 
             showBigAskButton(
@@ -325,11 +299,11 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Botón grande ASK LIFE IA.
+     * Sustituye visualmente el ASK LIFE original.
      *
-     * Su posición está ajustada para quedar
-     * EXACTAMENTE encima del botón ASK LIFE
-     * original y sustituirlo visualmente.
+     * El popup es deliberadamente más grande que el botón:
+     * primero pinta el fondo de LIFEAPP encima del botón antiguo
+     * y después coloca un único ASK LIFE IA en el centro.
      */
     private void showBigAskButton(
             View decor,
@@ -357,17 +331,26 @@ public class LifeAppActivity extends NativeActivity {
                         )
                 );
 
-        int left =
+        /*
+         * La máscara es mayor que el botón original
+         * para que no pueda asomar ninguna parte
+         * del antiguo ASK LIFE.
+         */
+        int maskWidth =
                 Math.round(
-                        width * 0.13f
+                        width * 0.84f
                 );
+
+        int maskHeight =
+                buttonHeight +
+                dp(30);
+
+        int maskLeft =
+                (width - maskWidth) / 2;
 
         int navigationInset =
                 getNavigationBarInset();
 
-        /*
-         * Altura de la barra inferior de LIFEAPP.
-         */
         int bottomMenuHeight =
                 Math.max(
                         dp(52),
@@ -381,22 +364,36 @@ public class LifeAppActivity extends NativeActivity {
                 navigationInset;
 
         /*
-         * IMPORTANTE:
+         * Posición del botón original.
          *
-         * Antes utilizábamos 18dp,
-         * lo que hacía que ASK LIFE IA quedara
-         * debajo del antiguo ASK LIFE.
-         *
-         * Lo subimos 22dp adicionales.
-         *
-         * De esta forma el nuevo botón cubre
-         * completamente al original.
+         * La máscara empieza algo más arriba
+         * y termina algo más abajo.
          */
-        int top =
+        int originalButtonTop =
                 appBottom -
                 bottomMenuHeight -
                 buttonHeight -
                 dp(40);
+
+        int maskTop =
+                originalButtonTop -
+                dp(15);
+
+        FrameLayout mask =
+                new FrameLayout(this);
+
+        /*
+         * Fondo general de LIFEAPP.
+         *
+         * Esto borra visualmente el botón ASK LIFE original.
+         */
+        mask.setBackgroundColor(
+                Color.rgb(
+                        249,
+                        251,
+                        255
+                )
+        );
 
         TextView button =
                 new TextView(this);
@@ -422,9 +419,6 @@ public class LifeAppActivity extends NativeActivity {
                 Typeface.BOLD
         );
 
-        /*
-         * Degradado LIFEAPP.
-         */
         GradientDrawable gradient =
                 new GradientDrawable(
                         GradientDrawable.Orientation.LEFT_RIGHT,
@@ -463,11 +457,23 @@ public class LifeAppActivity extends NativeActivity {
                 openAskLife()
         );
 
-        askHomePopup =
-                new PopupWindow(
-                        button,
+        FrameLayout.LayoutParams buttonParams =
+                new FrameLayout.LayoutParams(
                         buttonWidth,
                         buttonHeight,
+                        Gravity.CENTER
+                );
+
+        mask.addView(
+                button,
+                buttonParams
+        );
+
+        askHomePopup =
+                new PopupWindow(
+                        mask,
+                        maskWidth,
+                        maskHeight,
                         false
                 );
 
@@ -493,23 +499,22 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
+        /*
+         * Sin elevación en la máscara.
+         * La sombra pertenece solamente al botón.
+         */
         askHomePopup.setElevation(
-                dp(12)
+                0
         );
 
         askHomePopup.showAtLocation(
                 decor,
                 Gravity.TOP | Gravity.START,
-                left,
-                top
+                maskLeft,
+                maskTop
         );
     }
 
-    /**
-     * Oculta exclusivamente el botón grande.
-     *
-     * No toca la barra inferior.
-     */
     private void hideBigAskButton() {
 
         if (
@@ -525,10 +530,10 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Oculta SOLO la antigua pestaña pequeña ASK LIFE.
+     * Oculta solamente la antigua pestaña inferior ASK LIFE.
      *
-     * INICIO, EXPLORAR y PERFIL
-     * siguen siendo totalmente nativos.
+     * INICIO, EXPLORAR y PERFIL siguen funcionando
+     * directamente sobre LIFEAPP.
      */
     private void hideBottomAskTab(
             View decor,
@@ -546,14 +551,6 @@ public class LifeAppActivity extends NativeActivity {
         int navigationInset =
                 getNavigationBarInset();
 
-        /*
-         * LIFEAPP tenía cuatro posiciones:
-         *
-         * 0 - 25%       INICIO
-         * 25 - 50%      EXPLORAR
-         * 50 - 75%      ASK LIFE
-         * 75 - 100%     PERFIL
-         */
         int tabWidth =
                 width / 4;
 
@@ -597,12 +594,8 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        /*
-         * Consumimos el toque de la
-         * antigua pestaña ASK LIFE.
-         */
         blank.setOnClickListener(v -> {
-            // Intencionadamente vacío.
+            // La antigua pestaña ASK LIFE queda anulada.
         });
 
         askBottomBlocker =
@@ -648,12 +641,10 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Detectamos los toques sobre
-     * INICIO / EXPLORAR / PERFIL
-     * sin bloquear la navegación nativa.
+     * Detectamos cuándo cambia la sección.
      *
-     * Esto permite ocultar el botón grande
-     * cuando abandonamos Inicio.
+     * No consumimos estos eventos:
+     * LIFEAPP sigue recibiendo los toques normalmente.
      */
     @Override
     public boolean dispatchTouchEvent(
@@ -710,17 +701,13 @@ public class LifeAppActivity extends NativeActivity {
                 float y =
                         event.getY();
 
-                /*
-                 * Solo analizamos toques dentro
-                 * de la barra inferior.
-                 */
                 if (
                         y >= tabTop &&
                         y <= appBottom
                 ) {
 
                     /*
-                     * Primer cuarto: INICIO.
+                     * INICIO.
                      */
                     if (
                             x <
@@ -736,7 +723,7 @@ public class LifeAppActivity extends NativeActivity {
                         );
 
                     /*
-                     * Segundo cuarto: EXPLORAR.
+                     * EXPLORAR.
                      */
                     } else if (
                             x <
@@ -749,7 +736,7 @@ public class LifeAppActivity extends NativeActivity {
                         hideBigAskButton();
 
                     /*
-                     * Cuarto cuarto: PERFIL.
+                     * PERFIL.
                      */
                     } else if (
                             x >=
@@ -765,21 +752,11 @@ public class LifeAppActivity extends NativeActivity {
             }
         }
 
-        /*
-         * El evento sigue hacia LIFEAPP.
-         *
-         * No bloqueamos INICIO,
-         * EXPLORAR ni PERFIL.
-         */
         return super.dispatchTouchEvent(
                 event
         );
     }
 
-    /**
-     * Oculta todas nuestras capas
-     * mientras ASK LIFE IA está abierto.
-     */
     private void dismissAskControls() {
 
         hideBigAskButton();
@@ -796,9 +773,6 @@ public class LifeAppActivity extends NativeActivity {
                 null;
     }
 
-    /**
-     * Abre ASK LIFE IA.
-     */
     private void openAskLife() {
 
         dismissAskControls();
@@ -852,9 +826,6 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
-        /*
-         * Atrás cierra ASK LIFE IA.
-         */
         askDialog.setOnKeyListener(
                 (dialog, keyCode, event) -> {
 
@@ -889,10 +860,6 @@ public class LifeAppActivity extends NativeActivity {
                                 null;
                     }
 
-                    /*
-                     * Al cerrar el chat estamos
-                     * de nuevo en Inicio.
-                     */
                     isHomeSection =
                             true;
 
