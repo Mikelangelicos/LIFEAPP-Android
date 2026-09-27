@@ -73,13 +73,20 @@ public class LifeAppActivity extends NativeActivity {
     private Button contextualButton;
 
     /*
-     * Sustituye visualmente el ASK LIFE nativo.
+     * IMPORTANTE:
+     *
+     * Ya NO contiene un segundo botón.
+     *
+     * Es únicamente una capa transparente colocada
+     * encima del botón ASK LIFE original.
+     *
+     * Dentro solo sustituimos visualmente el texto.
      */
     private PopupWindow askHomePopup;
 
     /*
-     * Oculta únicamente la antigua pestaña
-     * ASK LIFE de la navegación inferior.
+     * Oculta la antigua pestaña pequeña ASK LIFE
+     * del menú inferior.
      */
     private PopupWindow askBottomBlocker;
 
@@ -111,13 +118,9 @@ public class LifeAppActivity extends NativeActivity {
         contextualButton =
                 new Button(this);
 
-        contextualButton.setText(
-                "⚙"
-        );
+        contextualButton.setText("⚙");
 
-        contextualButton.setTextSize(
-                22f
-        );
+        contextualButton.setTextSize(22f);
 
         contextualButton.setVisibility(
                 View.GONE
@@ -285,7 +288,7 @@ public class LifeAppActivity extends NativeActivity {
 
         if (isHomeSection) {
 
-            showBigAskButton(
+            showAskLifeOriginalReplacement(
                     decor,
                     width,
                     height
@@ -293,15 +296,23 @@ public class LifeAppActivity extends NativeActivity {
 
         } else {
 
-            hideBigAskButton();
+            hideAskLifeOriginalReplacement();
         }
     }
 
     /**
-     * Tapa completamente ASK LIFE original
-     * y muestra un único ASK LIFE IA.
+     * NO crea otro botón.
+     *
+     * Usa el botón ASK LIFE original como base.
+     *
+     * Esta capa:
+     *
+     * 1. deja visibles la forma, sombra y degradado originales;
+     * 2. tapa únicamente el texto ASK LIFE;
+     * 3. escribe ASK LIFE IA;
+     * 4. captura el toque para abrir nuestra IA.
      */
-    private void showBigAskButton(
+    private void showAskLifeOriginalReplacement(
             View decor,
             int width,
             int height
@@ -314,6 +325,11 @@ public class LifeAppActivity extends NativeActivity {
             return;
         }
 
+        /*
+         * Medidas aproximadas del botón ORIGINAL.
+         *
+         * No dibujamos nada alrededor.
+         */
         int buttonWidth =
                 Math.round(
                         width * 0.74f
@@ -327,17 +343,10 @@ public class LifeAppActivity extends NativeActivity {
                         )
                 );
 
-        int maskWidth =
+        int left =
                 Math.round(
-                        width * 0.84f
+                        width * 0.13f
                 );
-
-        int maskHeight =
-                buttonHeight +
-                dp(30);
-
-        int maskLeft =
-                (width - maskWidth) / 2;
 
         int navigationInset =
                 getNavigationBarInset();
@@ -354,52 +363,75 @@ public class LifeAppActivity extends NativeActivity {
                 height -
                 navigationInset;
 
-        int originalButtonTop =
+        /*
+         * Posición del ASK LIFE original.
+         */
+        int top =
                 appBottom -
                 bottomMenuHeight -
                 buttonHeight -
                 dp(40);
 
-        int maskTop =
-                originalButtonTop -
-                dp(15);
-
-        FrameLayout mask =
+        /*
+         * Capa TOTALMENTE TRANSPARENTE.
+         *
+         * Ya no hay rectángulo blanco.
+         * Ya no hay segundo botón.
+         */
+        FrameLayout touchLayer =
                 new FrameLayout(this);
 
-        mask.setBackgroundColor(
-                Color.rgb(
-                        249,
-                        251,
-                        255
-                )
+        touchLayer.setBackgroundColor(
+                Color.TRANSPARENT
         );
 
-        TextView button =
+        touchLayer.setClickable(true);
+
+        touchLayer.setFocusable(false);
+
+        touchLayer.setOnClickListener(v ->
+                openAskLife()
+        );
+
+        /*
+         * Únicamente sustituimos la zona central
+         * donde aparece el texto ASK LIFE.
+         *
+         * Como el botón original tiene un degradado
+         * horizontal, reproducimos ese mismo degradado
+         * solamente detrás del texto.
+         *
+         * No tiene esquinas redondeadas.
+         * Por tanto NO parece otro botón.
+         */
+        TextView newLabel =
                 new TextView(this);
 
-        button.setText(
+        newLabel.setText(
                 "ASK LIFE IA"
         );
 
-        button.setGravity(
+        newLabel.setGravity(
                 Gravity.CENTER
         );
 
-        button.setTextColor(
+        newLabel.setTextColor(
                 Color.WHITE
         );
 
-        button.setTextSize(
+        newLabel.setTextSize(
                 22f
         );
 
-        button.setTypeface(
+        newLabel.setTypeface(
                 Typeface.DEFAULT,
                 Typeface.BOLD
         );
 
-        GradientDrawable gradient =
+        /*
+         * Misma transición horizontal del botón.
+         */
+        GradientDrawable textBackground =
                 new GradientDrawable(
                         GradientDrawable.Orientation.LEFT_RIGHT,
                         new int[] {
@@ -421,39 +453,56 @@ public class LifeAppActivity extends NativeActivity {
                         }
                 );
 
-        gradient.setCornerRadius(
-                dp(28)
+        /*
+         * SIN radio.
+         *
+         * Es solamente una banda integrada
+         * dentro del botón original.
+         */
+        textBackground.setCornerRadius(0);
+
+        newLabel.setBackground(
+                textBackground
         );
 
-        button.setBackground(
-                gradient
-        );
-
-        button.setElevation(
-                dp(10)
-        );
-
-        button.setOnClickListener(v ->
-                openAskLife()
-        );
-
-        FrameLayout.LayoutParams buttonParams =
+        /*
+         * Esta banda tapa el antiguo ASK LIFE
+         * pero deja completamente intactos:
+         *
+         * - bordes
+         * - forma
+         * - sombra
+         * - posición
+         *
+         * del botón original.
+         */
+        FrameLayout.LayoutParams labelParams =
                 new FrameLayout.LayoutParams(
-                        buttonWidth,
-                        buttonHeight,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        dp(34),
                         Gravity.CENTER
                 );
 
-        mask.addView(
-                button,
-                buttonParams
+        touchLayer.addView(
+                newLabel,
+                labelParams
+        );
+
+        /*
+         * El TextView también abre ASK LIFE IA
+         * por si el toque cae directamente sobre él.
+         */
+        newLabel.setClickable(true);
+
+        newLabel.setOnClickListener(v ->
+                openAskLife()
         );
 
         askHomePopup =
                 new PopupWindow(
-                        mask,
-                        maskWidth,
-                        maskHeight,
+                        touchLayer,
+                        buttonWidth,
+                        buttonHeight,
                         false
                 );
 
@@ -479,19 +528,23 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        askHomePopup.setElevation(
-                0
-        );
+        /*
+         * CERO elevación.
+         *
+         * La sombra que vemos es la del botón
+         * original de LIFEAPP.
+         */
+        askHomePopup.setElevation(0);
 
         askHomePopup.showAtLocation(
                 decor,
                 Gravity.TOP | Gravity.START,
-                maskLeft,
-                maskTop
+                left,
+                top
         );
     }
 
-    private void hideBigAskButton() {
+    private void hideAskLifeOriginalReplacement() {
 
         if (
                 askHomePopup != null &&
@@ -505,6 +558,10 @@ public class LifeAppActivity extends NativeActivity {
                 null;
     }
 
+    /**
+     * Oculta únicamente la antigua pestaña
+     * pequeña ASK LIFE de la barra inferior.
+     */
     private void hideBottomAskTab(
             View decor,
             int width,
@@ -548,13 +605,9 @@ public class LifeAppActivity extends NativeActivity {
         FrameLayout blank =
                 new FrameLayout(this);
 
-        blank.setClickable(
-                true
-        );
+        blank.setClickable(true);
 
-        blank.setFocusable(
-                false
-        );
+        blank.setFocusable(false);
 
         blank.setBackgroundColor(
                 Color.rgb(
@@ -565,7 +618,7 @@ public class LifeAppActivity extends NativeActivity {
         );
 
         blank.setOnClickListener(v -> {
-            // ASK LIFE antiguo desactivado.
+            // ASK LIFE inferior antiguo desactivado.
         });
 
         askBottomBlocker =
@@ -576,21 +629,13 @@ public class LifeAppActivity extends NativeActivity {
                         false
                 );
 
-        askBottomBlocker.setTouchable(
-                true
-        );
+        askBottomBlocker.setTouchable(true);
 
-        askBottomBlocker.setFocusable(
-                false
-        );
+        askBottomBlocker.setFocusable(false);
 
-        askBottomBlocker.setOutsideTouchable(
-                false
-        );
+        askBottomBlocker.setOutsideTouchable(false);
 
-        askBottomBlocker.setClippingEnabled(
-                false
-        );
+        askBottomBlocker.setClippingEnabled(false);
 
         askBottomBlocker.setBackgroundDrawable(
                 new ColorDrawable(
@@ -670,6 +715,9 @@ public class LifeAppActivity extends NativeActivity {
                         y <= appBottom
                 ) {
 
+                    /*
+                     * INICIO
+                     */
                     if (
                             x <
                             width * 0.25f
@@ -683,6 +731,9 @@ public class LifeAppActivity extends NativeActivity {
                                 80
                         );
 
+                    /*
+                     * EXPLORAR
+                     */
                     } else if (
                             x <
                             width * 0.50f
@@ -691,8 +742,11 @@ public class LifeAppActivity extends NativeActivity {
                         isHomeSection =
                                 false;
 
-                        hideBigAskButton();
+                        hideAskLifeOriginalReplacement();
 
+                    /*
+                     * PERFIL
+                     */
                     } else if (
                             x >=
                             width * 0.75f
@@ -701,7 +755,7 @@ public class LifeAppActivity extends NativeActivity {
                         isHomeSection =
                                 false;
 
-                        hideBigAskButton();
+                        hideAskLifeOriginalReplacement();
                     }
                 }
             }
@@ -712,9 +766,13 @@ public class LifeAppActivity extends NativeActivity {
         );
     }
 
-    private void dismissAskControls() {
+    /**
+     * Solo se usa al destruir completamente
+     * la Activity.
+     */
+    private void dismissAskControlsCompletely() {
 
-        hideBigAskButton();
+        hideAskLifeOriginalReplacement();
 
         if (
                 askBottomBlocker != null &&
@@ -731,13 +789,22 @@ public class LifeAppActivity extends NativeActivity {
     /**
      * Abre ASK LIFE IA.
      *
-     * IMPORTANTE:
-     * primero mostramos el diálogo y SOLO DESPUÉS
-     * ocultamos el botón superpuesto.
+     * NO retiramos la capa del botón.
      *
-     * Así el antiguo ASK LIFE nunca queda visible.
+     * El diálogo se muestra encima y,
+     * cuando se cierra, el botón ya estaba ahí.
+     *
+     * Por tanto no existe ningún instante
+     * en el que reaparezca ASK LIFE.
      */
     private void openAskLife() {
+
+        if (
+                askDialog != null &&
+                askDialog.isShowing()
+        ) {
+            return;
+        }
 
         askDialog =
                 new Dialog(
@@ -763,21 +830,13 @@ public class LifeAppActivity extends NativeActivity {
         WebSettings settings =
                 askWebView.getSettings();
 
-        settings.setJavaScriptEnabled(
-                true
-        );
+        settings.setJavaScriptEnabled(true);
 
-        settings.setDomStorageEnabled(
-                true
-        );
+        settings.setDomStorageEnabled(true);
 
-        settings.setAllowFileAccess(
-                false
-        );
+        settings.setAllowFileAccess(false);
 
-        settings.setAllowContentAccess(
-                false
-        );
+        settings.setAllowContentAccess(false);
 
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
@@ -825,17 +884,14 @@ public class LifeAppActivity extends NativeActivity {
                     isHomeSection =
                             true;
 
-                    /*
-                     * Restauración inmediata.
-                     * No dejamos un frame con el ASK LIFE antiguo.
-                     */
-                    showAskControls();
+                    getWindow()
+                            .getDecorView()
+                            .post(
+                                    this::showAskControls
+                            );
                 }
         );
 
-        /*
-         * Configuramos primero una ventana opaca.
-         */
         Window window =
                 askDialog.getWindow();
 
@@ -868,9 +924,6 @@ public class LifeAppActivity extends NativeActivity {
             );
         }
 
-        /*
-         * Ahora mostramos el chat.
-         */
         askDialog.show();
 
         window =
@@ -882,16 +935,6 @@ public class LifeAppActivity extends NativeActivity {
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT
             );
-
-            /*
-             * Retiramos nuestras capas únicamente
-             * cuando la ventana del chat ya existe.
-             */
-            window
-                    .getDecorView()
-                    .post(
-                            this::dismissAskControls
-                    );
         }
 
         askWebView.loadDataWithBaseURL(
@@ -961,7 +1004,7 @@ public class LifeAppActivity extends NativeActivity {
     @Override
     protected void onDestroy() {
 
-        dismissAskControls();
+        dismissAskControlsCompletely();
 
         if (
                 askDialog != null &&
