@@ -73,13 +73,12 @@ public class LifeAppActivity extends NativeActivity {
     private Button contextualButton;
 
     /*
-     * Popup que tapa completamente el ASK LIFE nativo
-     * y muestra un único ASK LIFE IA.
+     * Sustituye visualmente el ASK LIFE nativo.
      */
     private PopupWindow askHomePopup;
 
     /*
-     * Oculta solamente la antigua pestaña pequeña
+     * Oculta únicamente la antigua pestaña
      * ASK LIFE de la navegación inferior.
      */
     private PopupWindow askBottomBlocker;
@@ -299,11 +298,8 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Sustituye visualmente el ASK LIFE original.
-     *
-     * El popup es deliberadamente más grande que el botón:
-     * primero pinta el fondo de LIFEAPP encima del botón antiguo
-     * y después coloca un único ASK LIFE IA en el centro.
+     * Tapa completamente ASK LIFE original
+     * y muestra un único ASK LIFE IA.
      */
     private void showBigAskButton(
             View decor,
@@ -331,11 +327,6 @@ public class LifeAppActivity extends NativeActivity {
                         )
                 );
 
-        /*
-         * La máscara es mayor que el botón original
-         * para que no pueda asomar ninguna parte
-         * del antiguo ASK LIFE.
-         */
         int maskWidth =
                 Math.round(
                         width * 0.84f
@@ -363,12 +354,6 @@ public class LifeAppActivity extends NativeActivity {
                 height -
                 navigationInset;
 
-        /*
-         * Posición del botón original.
-         *
-         * La máscara empieza algo más arriba
-         * y termina algo más abajo.
-         */
         int originalButtonTop =
                 appBottom -
                 bottomMenuHeight -
@@ -382,11 +367,6 @@ public class LifeAppActivity extends NativeActivity {
         FrameLayout mask =
                 new FrameLayout(this);
 
-        /*
-         * Fondo general de LIFEAPP.
-         *
-         * Esto borra visualmente el botón ASK LIFE original.
-         */
         mask.setBackgroundColor(
                 Color.rgb(
                         249,
@@ -499,10 +479,6 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        /*
-         * Sin elevación en la máscara.
-         * La sombra pertenece solamente al botón.
-         */
         askHomePopup.setElevation(
                 0
         );
@@ -529,12 +505,6 @@ public class LifeAppActivity extends NativeActivity {
                 null;
     }
 
-    /**
-     * Oculta solamente la antigua pestaña inferior ASK LIFE.
-     *
-     * INICIO, EXPLORAR y PERFIL siguen funcionando
-     * directamente sobre LIFEAPP.
-     */
     private void hideBottomAskTab(
             View decor,
             int width,
@@ -595,7 +565,7 @@ public class LifeAppActivity extends NativeActivity {
         );
 
         blank.setOnClickListener(v -> {
-            // La antigua pestaña ASK LIFE queda anulada.
+            // ASK LIFE antiguo desactivado.
         });
 
         askBottomBlocker =
@@ -640,12 +610,6 @@ public class LifeAppActivity extends NativeActivity {
         );
     }
 
-    /**
-     * Detectamos cuándo cambia la sección.
-     *
-     * No consumimos estos eventos:
-     * LIFEAPP sigue recibiendo los toques normalmente.
-     */
     @Override
     public boolean dispatchTouchEvent(
             MotionEvent event
@@ -706,9 +670,6 @@ public class LifeAppActivity extends NativeActivity {
                         y <= appBottom
                 ) {
 
-                    /*
-                     * INICIO.
-                     */
                     if (
                             x <
                             width * 0.25f
@@ -722,9 +683,6 @@ public class LifeAppActivity extends NativeActivity {
                                 80
                         );
 
-                    /*
-                     * EXPLORAR.
-                     */
                     } else if (
                             x <
                             width * 0.50f
@@ -735,9 +693,6 @@ public class LifeAppActivity extends NativeActivity {
 
                         hideBigAskButton();
 
-                    /*
-                     * PERFIL.
-                     */
                     } else if (
                             x >=
                             width * 0.75f
@@ -773,9 +728,16 @@ public class LifeAppActivity extends NativeActivity {
                 null;
     }
 
+    /**
+     * Abre ASK LIFE IA.
+     *
+     * IMPORTANTE:
+     * primero mostramos el diálogo y SOLO DESPUÉS
+     * ocultamos el botón superpuesto.
+     *
+     * Así el antiguo ASK LIFE nunca queda visible.
+     */
     private void openAskLife() {
-
-        dismissAskControls();
 
         askDialog =
                 new Dialog(
@@ -863,16 +825,17 @@ public class LifeAppActivity extends NativeActivity {
                     isHomeSection =
                             true;
 
-                    getWindow()
-                            .getDecorView()
-                            .post(
-                                    this::showAskControls
-                            );
+                    /*
+                     * Restauración inmediata.
+                     * No dejamos un frame con el ASK LIFE antiguo.
+                     */
+                    showAskControls();
                 }
         );
 
-        askDialog.show();
-
+        /*
+         * Configuramos primero una ventana opaca.
+         */
         Window window =
                 askDialog.getWindow();
 
@@ -903,11 +866,32 @@ public class LifeAppActivity extends NativeActivity {
                             20
                     )
             );
+        }
+
+        /*
+         * Ahora mostramos el chat.
+         */
+        askDialog.show();
+
+        window =
+                askDialog.getWindow();
+
+        if (window != null) {
 
             window.setLayout(
                     WindowManager.LayoutParams.MATCH_PARENT,
                     WindowManager.LayoutParams.MATCH_PARENT
             );
+
+            /*
+             * Retiramos nuestras capas únicamente
+             * cuando la ventana del chat ya existe.
+             */
+            window
+                    .getDecorView()
+                    .post(
+                            this::dismissAskControls
+                    );
         }
 
         askWebView.loadDataWithBaseURL(
