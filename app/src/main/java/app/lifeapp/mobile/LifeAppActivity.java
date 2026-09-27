@@ -9,10 +9,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowInsets;
@@ -23,7 +21,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 
@@ -80,16 +77,18 @@ public class LifeAppActivity extends NativeActivity {
     private PopupWindow askHomePopup;
 
     /*
-     * Barra inferior visual reconstruida:
-     * INICIO · EXPLORAR · PERFIL.
+     * Capa que oculta únicamente
+     * la antigua pestaña inferior ASK LIFE.
+     *
+     * IMPORTANTE:
+     * No cubre INICIO, EXPLORAR ni PERFIL,
+     * por lo que la navegación nativa sigue funcionando.
      */
     private PopupWindow askBottomBlocker;
 
     private Dialog askDialog;
 
     private WebView askWebView;
-
-    private int activeNavIndex = 0;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -99,15 +98,18 @@ public class LifeAppActivity extends NativeActivity {
         buildContextButton();
 
         /*
-         * No esperamos 1 segundo.
+         * Mostramos ASK LIFE IA en cuanto
+         * la ventana está disponible.
          *
-         * El retraso anterior hacía visible durante un instante
-         * el antiguo botón "Ask LIFE" antes de dibujar "ASK LIFE IA".
+         * Ya no esperamos 1 segundo, eliminando
+         * el parpadeo del antiguo "Ask LIFE".
          */
         getWindow()
                 .getDecorView()
                 .post(() -> {
+
                     applyNativeContentInsets();
+
                     showAskControls();
                 });
     }
@@ -159,8 +161,7 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Altura de la navegación inferior
-     * del sistema Android.
+     * Altura de la navegación inferior Android.
      */
     private int getNavigationBarInset() {
 
@@ -191,7 +192,7 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Altura de la barra de estado.
+     * Altura de la barra superior Android.
      */
     private int getStatusBarInset() {
 
@@ -222,11 +223,10 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Android 16 fuerza edge-to-edge para targetSdk 36.
+     * Corrige el edge-to-edge de Android 16.
      *
-     * LIFEAPP usa una superficie nativa, así que compensamos
-     * explícitamente las barras del sistema para evitar que la fila
-     * superior (Hola, indicador amarillo, etc.) quede demasiado arriba.
+     * Evita que la cabecera de LIFEAPP
+     * quede pegada debajo de la barra del sistema.
      */
     private void applyNativeContentInsets() {
 
@@ -260,10 +260,10 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Crea:
+     * Muestra:
      *
-     * 1. botón grande ASK LIFE IA
-     * 2. navegación inferior centrada sin la antigua pestaña ASK LIFE
+     * 1. Botón grande ASK LIFE IA.
+     * 2. Bloqueo únicamente del antiguo tab ASK LIFE.
      */
     private void showAskControls() {
 
@@ -273,6 +273,10 @@ public class LifeAppActivity extends NativeActivity {
             return;
         }
 
+        /*
+         * Mientras el chat IA está abierto
+         * no mostramos las capas de Inicio.
+         */
         if (
                 askDialog != null &&
                 askDialog.isShowing()
@@ -317,7 +321,7 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Sustituye visualmente el botón grande ASK LIFE original.
+     * Botón grande ASK LIFE IA.
      */
     private void showBigAskButton(
             View decor,
@@ -364,10 +368,6 @@ public class LifeAppActivity extends NativeActivity {
                         navigationInset
                 );
 
-        /*
-         * Posición calculada dentro del área útil,
-         * no debajo de las barras del sistema.
-         */
         int top =
                 statusInset +
                 Math.round(
@@ -479,12 +479,14 @@ public class LifeAppActivity extends NativeActivity {
     }
 
     /**
-     * Oculta la barra inferior nativa de cuatro huecos y la sustituye
-     * visualmente por tres destinos centrados.
+     * Oculta SOLO la antigua pestaña ASK LIFE.
      *
-     * Los toques se reenvían a las posiciones nativas originales,
-     * por lo que conservamos la navegación existente sin modificar
-     * liblifeapp.so.
+     * La navegación original permanece por debajo:
+     *
+     * INICIO      -> funciona
+     * EXPLORAR    -> funciona
+     * ASK LIFE    -> bloqueado/oculto
+     * PERFIL      -> funciona
      */
     private void hideBottomAskTab(
             View decor,
@@ -502,11 +504,19 @@ public class LifeAppActivity extends NativeActivity {
         int navigationInset =
                 getNavigationBarInset();
 
+        /*
+         * LIFEAPP tenía cuatro posiciones.
+         *
+         * ASK LIFE ocupa el tercer cuarto.
+         */
+        int tabWidth =
+                width / 4;
+
         int tabHeight =
                 Math.max(
-                        dp(58),
+                        dp(52),
                         Math.round(
-                                height * 0.060f
+                                height * 0.055f
                         )
                 );
 
@@ -516,24 +526,28 @@ public class LifeAppActivity extends NativeActivity {
 
         int tabTop =
                 appBottom -
-                tabHeight;
+                tabHeight -
+                dp(2);
 
         if (tabTop < 0) {
             tabTop = 0;
         }
 
-        LinearLayout nav =
-                new LinearLayout(this);
+        /*
+         * Fondo igual al de la barra inferior.
+         */
+        FrameLayout blank =
+                new FrameLayout(this);
 
-        nav.setOrientation(
-                LinearLayout.HORIZONTAL
+        blank.setClickable(
+                true
         );
 
-        nav.setGravity(
-                Gravity.CENTER
+        blank.setFocusable(
+                false
         );
 
-        nav.setBackgroundColor(
+        blank.setBackgroundColor(
                 Color.rgb(
                         249,
                         251,
@@ -541,40 +555,18 @@ public class LifeAppActivity extends NativeActivity {
                 )
         );
 
-        addCenteredNavItem(
-                nav,
-                "INICIO",
-                0,
-                decor,
-                width,
-                height,
-                0.125f
-        );
-
-        addCenteredNavItem(
-                nav,
-                "EXPLORAR",
-                1,
-                decor,
-                width,
-                height,
-                0.375f
-        );
-
-        addCenteredNavItem(
-                nav,
-                "PERFIL",
-                2,
-                decor,
-                width,
-                height,
-                0.875f
-        );
+        /*
+         * Consumimos únicamente el toque
+         * de la antigua posición ASK LIFE.
+         */
+        blank.setOnClickListener(v -> {
+            // Intencionadamente vacío.
+        });
 
         askBottomBlocker =
                 new PopupWindow(
-                        nav,
-                        width,
+                        blank,
+                        tabWidth,
                         tabHeight,
                         false
                 );
@@ -605,209 +597,25 @@ public class LifeAppActivity extends NativeActivity {
                 dp(10)
         );
 
+        /*
+         * Tercer cuarto:
+         *
+         * 0 - 25%       INICIO
+         * 25 - 50%      EXPLORAR
+         * 50 - 75%      ASK LIFE
+         * 75 - 100%     PERFIL
+         */
         askBottomBlocker.showAtLocation(
                 decor,
                 Gravity.TOP | Gravity.START,
-                0,
+                width / 2,
                 tabTop
         );
     }
 
-    private void addCenteredNavItem(
-            LinearLayout nav,
-            String title,
-            int index,
-            View decor,
-            int width,
-            int height,
-            float nativeXFraction
-    ) {
-
-        TextView item =
-                new TextView(this);
-
-        item.setGravity(
-                Gravity.CENTER
-        );
-
-        item.setTextSize(
-                11.5f
-        );
-
-        item.setTypeface(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-        );
-
-        item.setOnClickListener(v -> {
-
-            activeNavIndex =
-                    index;
-
-            refreshBottomNav();
-
-            dispatchNativeNavTap(
-                    decor,
-                    width,
-                    height,
-                    nativeXFraction
-            );
-        });
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        0,
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1f
-                );
-
-        nav.addView(
-                item,
-                params
-        );
-
-        styleNavItem(
-                item,
-                title,
-                index == activeNavIndex
-        );
-    }
-
-    private void styleNavItem(
-            TextView item,
-            String title,
-            boolean selected
-    ) {
-
-        item.setText(
-                (selected ? "●\n" : "○\n") +
-                title
-        );
-
-        item.setTextColor(
-                selected
-                        ? Color.rgb(
-                                108,
-                                82,
-                                226
-                        )
-                        : Color.rgb(
-                                92,
-                                99,
-                                115
-                        )
-        );
-    }
-
-    private void refreshBottomNav() {
-
-        if (
-                askBottomBlocker == null ||
-                !askBottomBlocker.isShowing()
-        ) {
-            return;
-        }
-
-        View content =
-                askBottomBlocker.getContentView();
-
-        if (!(content instanceof LinearLayout)) {
-            return;
-        }
-
-        LinearLayout nav =
-                (LinearLayout) content;
-
-        String[] titles = {
-                "INICIO",
-                "EXPLORAR",
-                "PERFIL"
-        };
-
-        for (
-                int i = 0;
-                i < nav.getChildCount() &&
-                i < titles.length;
-                i++
-        ) {
-
-            View child =
-                    nav.getChildAt(i);
-
-            if (child instanceof TextView) {
-
-                styleNavItem(
-                        (TextView) child,
-                        titles[i],
-                        i == activeNavIndex
-                );
-            }
-        }
-    }
-
     /**
-     * Envía el toque a la posición original de la barra nativa.
-     */
-    private void dispatchNativeNavTap(
-            View decor,
-            int width,
-            int height,
-            float xFraction
-    ) {
-
-        int navigationInset =
-                getNavigationBarInset();
-
-        int appBottom =
-                height -
-                navigationInset;
-
-        int y =
-                appBottom -
-                dp(30);
-
-        float x =
-                width *
-                xFraction;
-
-        long now =
-                SystemClock.uptimeMillis();
-
-        MotionEvent down =
-                MotionEvent.obtain(
-                        now,
-                        now,
-                        MotionEvent.ACTION_DOWN,
-                        x,
-                        y,
-                        0
-                );
-
-        MotionEvent up =
-                MotionEvent.obtain(
-                        now,
-                        now + 40,
-                        MotionEvent.ACTION_UP,
-                        x,
-                        y,
-                        0
-                );
-
-        decor.dispatchTouchEvent(
-                down
-        );
-
-        decor.dispatchTouchEvent(
-                up
-        );
-
-        down.recycle();
-        up.recycle();
-    }
-
-    /**
-     * Oculta las capas de Inicio
-     * mientras ASK LIFE IA está abierto.
+     * Oculta las capas LIFE IA
+     * mientras el chat está abierto.
      */
     private void dismissAskControls() {
 
@@ -875,6 +683,10 @@ public class LifeAppActivity extends NativeActivity {
                 false
         );
 
+        /*
+         * Puente con la interfaz web
+         * para cerrar ASK LIFE IA.
+         */
         askWebView.addJavascriptInterface(
                 new AskLifeBridge(),
                 "LifeApp"
@@ -884,6 +696,9 @@ public class LifeAppActivity extends NativeActivity {
                 askWebView
         );
 
+        /*
+         * Botón Atrás.
+         */
         askDialog.setOnKeyListener(
                 (dialog, keyCode, event) -> {
 
@@ -919,8 +734,10 @@ public class LifeAppActivity extends NativeActivity {
                     }
 
                     /*
-                     * Reponemos las capas en el siguiente frame.
-                     * Ya no hay un periodo visible con el antiguo Ask LIFE.
+                     * Restauramos ASK LIFE IA inmediatamente.
+                     *
+                     * Sin espera de 250 ms:
+                     * evita volver a ver el botón antiguo.
                      */
                     getWindow()
                             .getDecorView()
@@ -1004,7 +821,9 @@ public class LifeAppActivity extends NativeActivity {
         getWindow()
                 .getDecorView()
                 .post(() -> {
+
                     applyNativeContentInsets();
+
                     showAskControls();
                 });
     }
@@ -1023,7 +842,9 @@ public class LifeAppActivity extends NativeActivity {
             getWindow()
                     .getDecorView()
                     .post(() -> {
+
                         applyNativeContentInsets();
+
                         showAskControls();
                     });
         }
