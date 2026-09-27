@@ -57,16 +57,38 @@ jobs:
 
       - name: Verify LIFEAPP source
         run: |
-          echo "=== LIFEAPP SOURCE ==="
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
           test -f app/src/main/AndroidManifest.xml
           test -f app/src/main/jniLibs/arm64-v8a/liblifeapp.so
-          find app/src/main -maxdepth 8 -type f | sort
+
+      - name: Download LIFEAPP source from Supabase
+        run: |
+          curl -fsSL \
+            "https://rtggrizfrkplropltwdc.supabase.co/functions/v1/lifeapp-build-bridge?file=LifeAppActivity.java" \
+            -o app/src/main/java/app/lifeapp/mobile/LifeAppActivity.java
+
+          curl -fsSL \
+            "https://rtggrizfrkplropltwdc.supabase.co/functions/v1/lifeapp-build-bridge?file=native_patch.py" \
+            -o native_patch.py
+
+          echo "=== JAVA SOURCE RECEIVED ==="
+          grep -n "class LifeAppActivity" \
+            app/src/main/java/app/lifeapp/mobile/LifeAppActivity.java
+
+      - name: Patch native ASK LIFE
+        run: |
+          python3 native_patch.py
+
+          echo "=== NATIVE BUTTON ==="
+          strings \
+            app/src/main/jniLibs/arm64-v8a/liblifeapp.so \
+            | grep "ASK LIFE IA"
 
       - name: Build LIFEAPP
-        run: gradle :app:assembleDebug --stacktrace
+        run: |
+          gradle :app:assembleDebug --stacktrace
 
       - name: Show signing certificate
         run: |
@@ -74,7 +96,8 @@ jobs:
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
             -alias androiddebugkey \
-            -keypass android | grep -E "SHA256:|Owner:|Valid from:" || true
+            -keypass android \
+            | grep -E "SHA256:|Owner:|Valid from:" || true
 
       - name: Prepare APK
         run: |
@@ -87,7 +110,6 @@ jobs:
 
           cp "$APK" LIFEAPP-latest.apk
 
-          echo "=== APK ==="
           ls -lh LIFEAPP-latest.apk
 
       - name: Upload LIFEAPP APK
