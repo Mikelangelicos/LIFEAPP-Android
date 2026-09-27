@@ -13,28 +13,83 @@ on:
 
   workflow_dispatch:
 
+  schedule:
+    - cron: "17,47 * * * *"
+
 jobs:
   build:
     name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Read LIFEAPP version from Supabase
+        id: bridge
+        run: |
+          VERSION=$(curl -fsSL \
+            "https://rtggrizfrkplropltwdc.supabase.co/functions/v1/lifeapp-build-bridge?file=version")
+
+          if [ -z "$VERSION" ]; then
+            echo "ERROR: Supabase returned no LIFEAPP version"
+            exit 1
+          fi
+
+          echo "LIFEAPP Supabase version: $VERSION"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check if this LIFEAPP version was already built
+        id: source_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .lifeapp-build-marker
+          key: lifeapp-source-${{ steps.bridge.outputs.version }}
+
+      - name: Decide whether LIFEAPP needs a new APK
+        id: decision
+        shell: bash
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Supabase version: ${{ steps.bridge.outputs.version }}"
+          echo "Already built: ${{ steps.source_cache.outputs.cache-hit }}"
+
+          if [ "${{ github.event_name }}" = "schedule" ] && \
+             [ "${{ steps.source_cache.outputs.cache-hit }}" = "true" ]; then
+
+            echo "No hay cambios en LIFEAPP."
+            echo "No es necesario generar otro APK."
+
+            echo "build=false" >> "$GITHUB_OUTPUT"
+
+          else
+
+            echo "Hay una versión nueva o una compilación manual."
+            echo "Se generará un APK."
+
+            echo "build=true" >> "$GITHUB_OUTPUT"
+
+          fi
+
       - name: Checkout LIFEAPP
+        if: steps.decision.outputs.build == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Java 17
+        if: steps.decision.outputs.build == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Restore stable debug signing key
+        if: steps.decision.outputs.build == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
           key: lifeapp-debug-keystore-v1
 
       - name: Create stable debug signing key if missing
+        if: steps.decision.outputs.build == 'true'
         run: |
           mkdir -p "$HOME/.android"
 
@@ -51,11 +106,13 @@ jobs:
           fi
 
       - name: Set up Gradle
+        if: steps.decision.outputs.build == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.13"
 
       - name: Verify LIFEAPP source
+        if: steps.decision.outputs.build == 'true'
         run: |
           test -f settings.gradle.kts
           test -f build.gradle.kts
@@ -64,6 +121,7 @@ jobs:
           test -f app/src/main/jniLibs/arm64-v8a/liblifeapp.so
 
       - name: Download LIFEAPP source from Supabase
+        if: steps.decision.outputs.build == 'true'
         run: |
           curl -fsSL \
             "https://rtggrizfrkplropltwdc.supabase.co/functions/v1/lifeapp-build-bridge?file=LifeAppActivity.java" \
@@ -73,24 +131,29 @@ jobs:
             "https://rtggrizfrkplropltwdc.supabase.co/functions/v1/lifeapp-build-bridge?file=native_patch.py" \
             -o native_patch.py
 
-          echo "=== JAVA SOURCE RECEIVED ==="
+          echo "=== LIFEAPP SOURCE FROM SUPABASE ==="
+
           grep -n "class LifeAppActivity" \
             app/src/main/java/app/lifeapp/mobile/LifeAppActivity.java
 
       - name: Patch native ASK LIFE
+        if: steps.decision.outputs.build == 'true'
         run: |
           python3 native_patch.py
 
-          echo "=== NATIVE BUTTON ==="
+          echo "=== NATIVE ASK LIFE IA ==="
+
           strings \
             app/src/main/jniLibs/arm64-v8a/liblifeapp.so \
             | grep "ASK LIFE IA"
 
       - name: Build LIFEAPP
+        if: steps.decision.outputs.build == 'true'
         run: |
           gradle :app:assembleDebug --stacktrace
 
       - name: Show signing certificate
+        if: steps.decision.outputs.build == 'true'
         run: |
           keytool -list -v \
             -keystore "$HOME/.android/debug.keystore" \
@@ -100,6 +163,7 @@ jobs:
             | grep -E "SHA256:|Owner:|Valid from:" || true
 
       - name: Prepare APK
+        if: steps.decision.outputs.build == 'true'
         run: |
           APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
 
@@ -110,12 +174,34 @@ jobs:
 
           cp "$APK" LIFEAPP-latest.apk
 
+          echo "=== LIFEAPP APK ==="
+
           ls -lh LIFEAPP-latest.apk
 
       - name: Upload LIFEAPP APK
+        if: steps.decision.outputs.build == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: LIFEAPP-APK
           path: LIFEAPP-latest.apk
           retention-days: 30
           if-no-files-found: error
+
+      - name: Mark Supabase LIFEAPP version as built
+        if: >
+          steps.decision.outputs.build == 'true' &&
+          steps.source_cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .lifeapp-build-marker
+
+          echo "${{ steps.bridge.outputs.version }}" \
+            > .lifeapp-build-marker/version.txt
+
+      - name: Save LIFEAPP version marker
+        if: >
+          steps.decision.outputs.build == 'true' &&
+          steps.source_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .lifeapp-build-marker
+          key: lifeapp-source-${{ steps.bridge.outputs.version }}
